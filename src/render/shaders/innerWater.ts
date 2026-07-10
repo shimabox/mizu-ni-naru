@@ -12,14 +12,19 @@ export const WATER_VISUAL_RATIO = 0.985;
 
 /** 球インスタンスの状態駆動変形(glass と同一式 — 水は等方縮小で追従)。 */
 export const BUBBLE_STATE_TRANSFORM_GLSL = /* glsl */ `
-// state 駆動の変形係数(§3)— grow / stretchY / alive を返す
-vec3 bubbleTransform(float state, float prog) {
+// state 駆動の変形係数(§3)— grow / stretchY / alive / wobbleGain を返す
+vec4 bubbleTransform(float state, float prog) {
   float grow = (state == 0.0) ? 0.6 + 0.5 * prog - 0.1 * sin(prog * 9.0) : 1.0;
   float strain = (state == 2.0) ? prog : 0.0;
-  float stretchY = 1.0 + strain * 0.10 + ((state == 3.0) ? 0.14 * prog : 0.0);
+  // Falling: 落下開始 ≈0.5 s で張り(+0.10)を解き +0.04 の空力感のみ残す(A29)
+  float fallRelax = (state == 3.0) ? min(prog * 8.0, 1.0) : 0.0;
+  float stretchY = 1.0 + strain * 0.10
+                 + ((state == 3.0) ? mix(0.10, 0.04, fallRelax) : 0.0);
   // 中身(水)は Splashing 進入と同時に消える(§3 — 海の FX が受け継ぐ)
   float alive = (state >= 4.0) ? 0.0 : 1.0;
-  return vec3(grow, stretchY, alive);
+  // wobble の視覚ゲイン — Falling で減衰し剛体的に落ちる(A29)
+  float wobbleGain = 1.0 - fallRelax;
+  return vec4(grow, stretchY, alive, wobbleGain);
 }
 `;
 
@@ -42,7 +47,7 @@ void main() {
   float state = floor(aCurrB.w);
   float prog = fract(aCurrB.w);
 
-  vec3 tf = bubbleTransform(state, prog);
+  vec4 tf = bubbleTransform(state, prog);
   // ガラスの xz 圧縮(1/√stretchY)の内側に収まる等方半径
   float s = ${WATER_VISUAL_RATIO} * inversesqrt(tf.y);
   float Rv = R * s * tf.x * tf.z;

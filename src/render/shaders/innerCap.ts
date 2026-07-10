@@ -31,7 +31,7 @@ void main() {
   float state = floor(aCurrB.w);
   float prog = fract(aCurrB.w);
 
-  vec3 tf = bubbleTransform(state, prog);
+  vec4 tf = bubbleTransform(state, prog);
   float s = ${WATER_VISUAL_RATIO} * inversesqrt(tf.y);
   float Rv = R * s * tf.x * tf.z;
   float wlv = wl * tf.x * tf.z;
@@ -39,8 +39,9 @@ void main() {
 
   vec2 disk = position.xz;             // 単位円盤
   vec2 capXZ = disk * capR;
-  // 広域の緩い揺れ(振幅 0.008R、Straining は wobble 連動で ×3)
-  float amp = 0.008 * R * (1.0 + 2.0 * wobble) * tf.z;
+  // 広域の緩い揺れ(振幅 0.008R、Straining は wobble 連動で ×3。
+  // Falling は wobbleGain(tf.w)で減衰 — 水面も暴れず剛体的に落ちる A29)
+  float amp = 0.008 * R * (1.0 + 2.0 * wobble * tf.w) * tf.z;
   float sway = sin(capXZ.x * 5.0 + uTimeSec * 1.3 + aMisc.y * 6.283)
              + sin(capXZ.y * 6.2 - uTimeSec * 1.7 + aMisc.y * 4.1);
   vec3 wp = center + vec3(capXZ.x, wlv + amp * sway, capXZ.y);
