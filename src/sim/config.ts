@@ -120,7 +120,11 @@ export const DROPLET_RIPPLE_SPAN = 0.4;
  * R が両辺で消えるため球サイズに依存しない(§5.4 のスケール不変性)。
  */
 export const VOLUME_GAIN = 15;
-/** 球冠 LUT(§4.2): 257 エントリ(1KB)。誤差 ≤5×10⁻⁴(中央)/ 2×10⁻³(端点帯)。 */
+/**
+ * 球冠 LUT(§4.2): 257 エントリ(1KB)。誤差 ≤5×10⁻⁴(中央)/ 2×10⁻³(端点帯)。
+ * 端点は漸近式 u = √(f/3)(対称)へ切替(du/df の √ 特異性対策)。
+ * 実体は core/CapLut.ts(sim/core は config に依存できない — depcruise の
+ * sim-core-is-base)。ここは文書化ミラーで、一致はテストで固定する。
+ */
 export const CAP_LUT_SIZE = 256;
-/** 端点は漸近式 u = √(f/3)(対称)へ切替(du/df の √ 特異性が一様 LUT の弦誤差を壊すため)。 */
 export const CAP_LUT_ENDPOINT_F = 1 / 64;
