@@ -1,6 +1,7 @@
 import type { SimLike, SkyRenderer } from '../contract/RenderView';
 import { SLOT_COUNT_DESKTOP, SLOT_COUNT_MOBILE } from '../contract/WorldSpec';
 import { SceneRenderer } from '../render/SceneRenderer';
+import { MizuNiNaruSim } from '../sim/MizuNiNaruSim';
 import { StubSim } from '../sim/StubSim';
 import { accumulate } from './accumulator';
 import { parseUrlParams } from './urlParams';
@@ -22,8 +23,9 @@ window.addEventListener('DOMContentLoaded', () => {
     params.slots ??
     (window.innerWidth < 768 ? SLOT_COUNT_MOBILE : SLOT_COUNT_DESKTOP);
 
-  // Phase 0 は StubSim のみ(`?sim=stub` 明示と同義)。実 sim は Phase 1 で合流
-  const sim: SimLike = new StubSim();
+  // 既定は実 sim(Phase 1)。`?sim=stub` で StubSim(render 開発用の合成アニメ)
+  const sim: SimLike =
+    params.sim === 'stub' ? new StubSim() : new MizuNiNaruSim();
   sim.init({ seed, slotCount });
 
   const renderer: SkyRenderer = new SceneRenderer(canvas, {
