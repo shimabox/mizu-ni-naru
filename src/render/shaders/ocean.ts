@@ -10,7 +10,10 @@ import { SKY_CHUNK_GLSL, SKY_UNIFORMS_GLSL } from './sky';
  *   勾配線形加算の法線合成で統合。域内はスウェル振幅 25% 減衰
  *   (リングの読み取りやすさ — §2.2)
  * - (c) フレネル / Beer-Lambert / 擬似 SSS / タイトスペキュラ + glitter / フォグ
- * Phase 3 残: フォーム §2.4 / 解析反射 §2.5。
+ * - (d) フォーム 2 系統(ヤコビアン波頭 + B チャネル着水リング)+ Mizu の刻印
+ * - (e) ANALYTIC_REFLECTIONS: ≤7 球の解析的球面反射(reflectEnv)
+ * HDR 上限規約: glitter ≤ 3.5 / スペキュラ ≤ 4.0 / SSS ≤ 1.6
+ * (bloom threshold 1.15 を上回るのはスペキュラ系のみ — §2.3)。
  */
 
 /** リップルフィールド uniform(#define RIPPLE_FIELD で有効化 — §2.2)。 */
