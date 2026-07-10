@@ -20,6 +20,7 @@ import { BubbleInstanceBuffers } from './bubbles/BubbleInstanceBuffers';
 import { InnerWaterSystem } from './bubbles/InnerWaterSystem';
 import { OceanSystem } from './ocean/OceanSystem';
 import { RippleField } from './ocean/RippleField';
+import { SpraySystem } from './particles/SpraySystem';
 
 /** 既定の DPR 上限(Retina 超のフィル爆発防止 — design-render §1.2)。 */
 const DEFAULT_MAX_PIXEL_RATIO = 2;
@@ -96,6 +97,11 @@ export class SceneRenderer implements SkyRenderer {
     );
     this.addSystem(
       new BubbleGlassSystem(environment.sunUniforms, this.bubbleBuffers),
+    );
+    // スプレー(§6)— 着水クラウン + ポップ膜片。落着マイクロスプラットは
+    // RippleField のスケジューラへ予約する
+    this.addSystem(
+      new SpraySystem(environment.sunUniforms, rippleField.scheduler),
     );
 
     this.post = new PostPipeline(
