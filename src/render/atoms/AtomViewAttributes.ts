@@ -7,8 +7,8 @@ const V4 = 4;
 /**
  * AtomView をラップした共有インスタンス属性(design-render §5)。
  *
- * AtomSystem(本体)と LabelSystem(文字)が同一の InstancedBufferAttribute
- * を共有 — 追加アップロードゼロ。配列は sim 所有・インプレース変異
+ * LabelSystem(文字 = 原子の本体)が InstancedBufferAttribute として
+ * そのまま参照 — 追加アップロードゼロ。配列は sim 所有・インプレース変異
  * (ゼロコピー契約)なので、毎フレーム一括 1 レンジで needsUpdate を立てる。
  * 再確保(version++ / 配列差し替え)時は再ラップし generation を進める —
  * 利用側は generation を見て geometry.setAttribute し直す。

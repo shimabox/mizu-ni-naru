@@ -11,7 +11,7 @@ import { DROPLET_VIEW_CAPACITY } from '../../contract/WorldSpec';
 import type { SunUniforms } from '../Environment';
 import type { FrameInfo, RenderSystem } from '../RenderSystem';
 import { DROPLET_FRAGMENT_GLSL, DROPLET_VERTEX_GLSL } from '../shaders/droplet';
-import { createBillboardQuadGeometry, writeCameraBasis } from './AtomSystem';
+import { createBillboardQuadGeometry, writeCameraBasis } from './billboard';
 
 const V4 = 4;
 

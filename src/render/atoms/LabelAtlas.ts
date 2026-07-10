@@ -5,7 +5,14 @@ import { CanvasTexture, LinearFilter, LinearMipmapLinearFilter } from 'three';
  *
  * 1024×256 canvas に 256² セル ×4(H / O / H₂ / 予備)。**セル順 = KIND_INDEX**。
  * H₂ の下付きは「小フォント + ベースライン下げ」の 2 フォントトリック。
- * troika(1 Text = 1 draw)は不採用 — 全ラベルを加算 1 draw で描くため。
+ * troika(1 Text = 1 draw)は不採用 — 全ラベルを 1 draw で描くため。
+ *
+ * チャネル設計(文字が主役 — 発光球なしでも全背景で判読するため):
+ * - G = 文字本体の被覆(シェーダで per-atom 色に着色)
+ * - R = 縁取り(ストローク)の被覆 — 明るい空でも文字が沈まない暗色エッジ
+ * - A = 両者の合計被覆(αブレンドのアルファ)
+ * ストローク(#f00)→ フィル(#0f0)の順に描くと重なり部はフィルが上書きし、
+ * R はエッジ専用・G は本体専用にきれいに分離する。
  */
 export const LABEL_ATLAS_WIDTH = 1024;
 export const LABEL_ATLAS_HEIGHT = 256;
@@ -56,6 +63,21 @@ const MAIN_FONT = 'bold 150px "Helvetica Neue", Arial, sans-serif';
 const SUB_FONT = 'bold 90px "Helvetica Neue", Arial, sans-serif';
 /** 下付きのベースライン下げ(px)。 */
 const SUB_BASELINE_DROP = 48;
+/** 縁取り幅(px — 片側 ≈ lineWidth/2。150px フォント比で細めのエッジ)。 */
+const STROKE_WIDTH = 18;
+
+/** グリフの各パーツ(主文字/下付き)を stroke → fill の 2 パスで描く。 */
+const drawGlyphPasses = (
+  ctx: CanvasRenderingContext2D,
+  draw: (pass: 'stroke' | 'fill') => void,
+): void => {
+  ctx.lineWidth = STROKE_WIDTH;
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = '#ff0000'; // R = 縁取りチャネル
+  draw('stroke');
+  ctx.fillStyle = '#00ff00'; // G = 本体チャネル(重なりは fill が上書き)
+  draw('fill');
+};
 
 /** アトラス canvas の焼き込み(DOM 必須 — 起動時 1 回)。 */
 export const createLabelAtlasCanvas = (): HTMLCanvasElement => {
@@ -66,7 +88,6 @@ export const createLabelAtlasCanvas = (): HTMLCanvasElement => {
   if (!ctx) throw new Error('2D context unavailable');
 
   ctx.clearRect(0, 0, LABEL_ATLAS_WIDTH, LABEL_ATLAS_HEIGHT);
-  ctx.fillStyle = '#ffffff';
   ctx.textBaseline = 'middle';
 
   GLYPHS.forEach((glyph, kindIndex) => {
@@ -74,9 +95,12 @@ export const createLabelAtlasCanvas = (): HTMLCanvasElement => {
     const cx = cell.x + cell.size / 2;
     const cy = cell.y + cell.size / 2;
     if (!glyph.sub) {
-      ctx.font = MAIN_FONT;
       ctx.textAlign = 'center';
-      ctx.fillText(glyph.main, cx, cy);
+      drawGlyphPasses(ctx, (pass) => {
+        ctx.font = MAIN_FONT;
+        if (pass === 'stroke') ctx.strokeText(glyph.main, cx, cy);
+        else ctx.fillText(glyph.main, cx, cy);
+      });
       return;
     }
     // 2 フォントトリック: 主文字 + 小フォントの下付き(ベースライン下げ)
@@ -87,10 +111,16 @@ export const createLabelAtlasCanvas = (): HTMLCanvasElement => {
     const total = mainW + subW * 0.9;
     const startX = cx - total / 2;
     ctx.textAlign = 'left';
-    ctx.font = MAIN_FONT;
-    ctx.fillText(glyph.main, startX, cy);
-    ctx.font = SUB_FONT;
-    ctx.fillText(glyph.sub, startX + mainW, cy + SUB_BASELINE_DROP);
+    const sub = glyph.sub;
+    drawGlyphPasses(ctx, (pass) => {
+      ctx.font = MAIN_FONT;
+      if (pass === 'stroke') ctx.strokeText(glyph.main, startX, cy);
+      else ctx.fillText(glyph.main, startX, cy);
+      ctx.font = SUB_FONT;
+      if (pass === 'stroke')
+        ctx.strokeText(sub, startX + mainW, cy + SUB_BASELINE_DROP);
+      else ctx.fillText(sub, startX + mainW, cy + SUB_BASELINE_DROP);
+    });
   });
 
   return canvas;

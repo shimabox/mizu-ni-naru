@@ -12,7 +12,6 @@ import { Environment } from './Environment';
 import { createNoiseTexture } from './NoiseTexture';
 import { PostPipeline } from './PostPipeline';
 import type { FrameInfo, RenderSystem } from './RenderSystem';
-import { AtomSystem } from './atoms/AtomSystem';
 import { AtomViewAttributes } from './atoms/AtomViewAttributes';
 import { DropletSystem } from './atoms/DropletSystem';
 import { LabelSystem } from './atoms/LabelSystem';
@@ -74,7 +73,6 @@ export class SceneRenderer implements SkyRenderer {
     this.addSystem(environment);
     this.addSystem(new OceanSystem(environment.sunUniforms, this.noiseTexture));
     this.atomAttributes = new AtomViewAttributes();
-    this.addSystem(new AtomSystem(this.atomAttributes));
     this.addSystem(new DropletSystem(environment.sunUniforms));
     this.addSystem(new LabelSystem(this.atomAttributes));
     this.bubbleBuffers = new BubbleInstanceBuffers();
@@ -109,7 +107,7 @@ export class SceneRenderer implements SkyRenderer {
     this.cameraRig.update(frame.timeSec);
     // 7 球の CPU 距離ソート + 共有インスタンス属性の一括アップロード(§1.3)
     this.bubbleBuffers.sync(view, this.cameraRig.camera);
-    // AtomView のゼロコピー属性(AtomSystem / LabelSystem 共有)
+    // AtomView のゼロコピー属性(LabelSystem = 文字が原子の本体)
     this.atomAttributes.sync(view);
     for (const system of this.systems) {
       system.update(view, frame);

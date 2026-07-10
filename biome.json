@@ -8,7 +8,7 @@
   "files": {
     "include": ["src/**/*", "tests/**/*"],
     "ignoreUnknown": false,
-    "ignore": []
+    "ignore": ["**/.claude/**"]
   },
   "formatter": {
     "enabled": true,

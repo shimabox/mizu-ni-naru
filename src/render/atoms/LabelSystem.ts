@@ -1,5 +1,4 @@
 import {
-  AdditiveBlending,
   type CanvasTexture,
   InstancedBufferGeometry,
   Mesh,
@@ -9,13 +8,15 @@ import {
 import type { SkyRenderView } from '../../contract/RenderView';
 import type { FrameInfo, RenderSystem } from '../RenderSystem';
 import { LABEL_FRAGMENT_GLSL, LABEL_VERTEX_GLSL } from '../shaders/label';
-import { createBillboardQuadGeometry, writeCameraBasis } from './AtomSystem';
 import type { AtomViewAttributes } from './AtomViewAttributes';
 import { createLabelAtlasTexture } from './LabelAtlas';
+import { createBillboardQuadGeometry, writeCameraBasis } from './billboard';
 
 /**
- * 原子ラベル(design-render §5)— AtomSystem と属性バッファ共有の加算 1 draw。
- * 加算 = 順序非依存・depthTest on / depthWrite off。発光強度 1.2。
+ * 原子 = 文字(design-render §5 改: 文字が主役)— 1 draw。
+ * 発光球インポスターは廃止し、文字そのものが粒子として漂う。
+ * 縁取り焼き込みアトラス + per-atom 着色 + **通常アルファブレンド**
+ * (加算は白い空で消えるため不採用)。depthTest on / depthWrite off。
  */
 export class LabelSystem implements RenderSystem {
   public readonly object: Mesh;
@@ -50,7 +51,6 @@ export class LabelSystem implements RenderSystem {
       depthTest: true,
       depthWrite: false,
     });
-    this.material.blending = AdditiveBlending;
 
     this.object = new Mesh(this.geometry, this.material);
     this.object.renderOrder = 8; // 半透明群の最後(§1.3)
