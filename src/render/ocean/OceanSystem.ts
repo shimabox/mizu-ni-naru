@@ -11,6 +11,7 @@ import {
 } from '../shaders/gerstner';
 import { OCEAN_FRAGMENT_GLSL, OCEAN_VERTEX_GLSL } from '../shaders/ocean';
 import { OceanGeometryCache } from './OceanGeometry';
+import type { RippleUniforms } from './RippleField';
 
 const TWO_PI = 2 * Math.PI;
 
@@ -38,7 +39,11 @@ export class OceanSystem implements RenderSystem {
   private readonly waveB: Vector4[];
   private readonly phaseRates: number[];
 
-  constructor(sun: SunUniforms, noiseTexture: DataTexture) {
+  constructor(
+    sun: SunUniforms,
+    noiseTexture: DataTexture,
+    ripple: RippleUniforms,
+  ) {
     const waveA: Vector4[] = [];
     this.waveB = [];
     this.phaseRates = [];
@@ -66,10 +71,16 @@ export class OceanSystem implements RenderSystem {
         uMidColor: { value: new Color(0x0d4d6e) },
         uSssColor: { value: new Color(0x2fc0a8) },
         uFoamColor: { value: new Color(0xeef7f5) },
+        // リップルフィールド(RippleField と uniform 値オブジェクトを共有 —
+        // prerender のピンポン swap がテクスチャ参照を差し替える)
+        uRipple: ripple.uRipple,
+        uRippleTexelUv: ripple.uRippleTexelUv,
+        uRippleTexelWorld: ripple.uRippleTexelWorld,
+        uRippleHalfExtent: ripple.uRippleHalfExtent,
       },
-      // Phase 3: ANALYTIC_REFLECTIONS / RIPPLE_FIELD の 2 変種を事前コンパイルし
-      // 参照切替(needsUpdate 再コンパイルのヒッチ回避 — §9.3)
-      defines: {},
+      // ANALYTIC_REFLECTIONS のティア変種(off)は Phase 4 で事前コンパイル
+      // し参照切替(needsUpdate 再コンパイルのヒッチ回避 — §9.3)
+      defines: { RIPPLE_FIELD: '' },
     });
 
     const [rings, segments] = GRID_BY_TIER[0];

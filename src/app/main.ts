@@ -33,6 +33,11 @@ window.addEventListener('DOMContentLoaded', () => {
     parallax: !params.measure,
   });
 
+  // 計測フック(E2E 検証・ベンチ用: SimCounts の読み出し。
+  // StatsOverlay(Phase 4)が正式な表示契約 — これは読み取り専用の裏口)
+  (window as unknown as { __mizuCounts?: unknown }).__mizuCounts = () =>
+    sim.counts();
+
   let remainder = 0;
   let lastTimestamp: number | undefined;
   let rafId = 0;

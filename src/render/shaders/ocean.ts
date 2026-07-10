@@ -2,38 +2,59 @@ import { GERSTNER_CHUNK_GLSL, GERSTNER_UNIFORMS_GLSL } from './gerstner';
 import { SKY_CHUNK_GLSL, SKY_UNIFORMS_GLSL } from './sky';
 
 /**
- * Ocean v2 の頂点/フラグメント(design-render §2.1 / §2.3 / §2.6)。
+ * Ocean v2 の頂点/フラグメント(design-render §2.1 / §2.2 / §2.3 / §2.6)。
  *
- * Phase 2 スコープ: Gerstner + シェーディング(フレネル / Beer-Lambert /
- * 擬似 SSS / タイトスペキュラ + glitter / sky() フォグ)。
- * Phase 3(リップル §2.2・フォーム §2.4・解析反射 §2.5)は
- * uniform / define の TODO フックのみ置く。
+ * - (a) Gerstner 8 波(頂点 0-4 変位 / フラグメント 8 波解析導関数)
+ * - (b) RIPPLE_FIELD: 中央アクション域のハイトフィールドを頂点 1 タップ変位 +
+ *   勾配線形加算の法線合成で統合。域内はスウェル振幅 25% 減衰
+ *   (リングの読み取りやすさ — §2.2)
+ * - (c) フレネル / Beer-Lambert / 擬似 SSS / タイトスペキュラ + glitter / フォグ
+ * Phase 3 残: フォーム §2.4 / 解析反射 §2.5。
  */
 
-/** Phase 3 フック: リップルフィールド(#define RIPPLE_FIELD で有効化)。 */
-export const OCEAN_RIPPLE_HOOK_UNIFORMS_GLSL = /* glsl */ `
+/** リップルフィールド uniform(#define RIPPLE_FIELD で有効化 — §2.2)。 */
+export const OCEAN_RIPPLE_UNIFORMS_GLSL = /* glsl */ `
 #ifdef RIPPLE_FIELD
-// TODO(Phase 3 §2.2): uniform sampler2D uRipple; uniform vec2 uRippleCenter;
-// uniform float uRippleTexelWorld;(高さ R / 速度 G / フォーム B)
+uniform sampler2D uRipple;        // R=height / G=velocity / B=foam / A=tint
+uniform float uRippleTexelUv;     // 1 / 解像度
+uniform float uRippleTexelWorld;  // 域幅 / 解像度 [u]
+uniform float uRippleHalfExtent;  // 12u(域中心は原点固定)
+
+// アクション域のスウェル減衰: 域内 25% 減(×0.75 → 1.0 へ smoothstep)
+float swellZoneGain(vec2 xz) {
+  return mix(0.75, 1.0, smoothstep(6.0, 12.0, length(xz)));
+}
+// 域外フェード(法線・変位・フォームの寄与を縁で 0 に)
+float rippleMask(vec2 xz) {
+  return 1.0 - smoothstep(10.5, 12.0, length(xz));
+}
+vec2 rippleUv(vec2 xz) {
+  return xz / (2.0 * uRippleHalfExtent) + 0.5;
+}
 #endif
 `;
 
 export const OCEAN_VERTEX_GLSL = /* glsl */ `
 precision highp float;
 ${GERSTNER_UNIFORMS_GLSL}
-${OCEAN_RIPPLE_HOOK_UNIFORMS_GLSL}
+${OCEAN_RIPPLE_UNIFORMS_GLSL}
 ${GERSTNER_CHUNK_GLSL}
 varying vec3 vWorldPos;
 varying float vWaveY;
 
 void main() {
   vec2 xz = position.xz;
-  // 頂点は波 0-4 のみ(chop 5-7 は頂点解像度未満 — フラグメント法線専任 §2.1)
-  vec3 off = gerstnerOffset(xz, 0, 5);
+  float gain = uSwellGain;
   #ifdef RIPPLE_FIELD
-  // TODO(Phase 3 §2.2): off.y += リップル高さの 1 タップ vertex texture fetch
+  gain *= swellZoneGain(xz);
   #endif
+  // 頂点は波 0-4 のみ(chop 5-7 は頂点解像度未満 — フラグメント法線専任 §2.1)
+  vec3 off = gerstnerOffset(xz, 0, 5, gain);
   vec3 wp = vec3(xz.x + off.x, off.y, xz.y + off.z);
+  #ifdef RIPPLE_FIELD
+  // Gerstner 変位後のワールド xz で 1 タップ(横変位 ≤ 0.25u < 4 texel — §2.2)
+  wp.y += texture2D(uRipple, rippleUv(wp.xz)).r * rippleMask(wp.xz);
+  #endif
   vWorldPos = wp;
   vWaveY = off.y;
   gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
@@ -44,7 +65,7 @@ export const OCEAN_FRAGMENT_GLSL = /* glsl */ `
 precision highp float;
 ${SKY_UNIFORMS_GLSL}
 ${GERSTNER_UNIFORMS_GLSL}
-${OCEAN_RIPPLE_HOOK_UNIFORMS_GLSL}
+${OCEAN_RIPPLE_UNIFORMS_GLSL}
 uniform sampler2D uNoise;
 uniform float uTimeSec;
 uniform float uSwellAmpSum;
@@ -65,19 +86,40 @@ ${SKY_CHUNK_GLSL}
 ${GERSTNER_CHUNK_GLSL}
 
 void main() {
-  // 1) 法線: 8 波解析導関数(頂点法線補間より常に鮮鋭 — §2.1)
+  // 1) 法線: 8 波解析導関数 + リップル勾配の線形加算(§2.1 / §2.2)
+  float gain = uSwellGain;
+  #ifdef RIPPLE_FIELD
+  gain *= swellZoneGain(vWorldPos.xz);
+  #endif
   vec3 grad;
   float jac;
-  gerstnerDeriv(vWorldPos.xz, grad, jac);
+  gerstnerDeriv(vWorldPos.xz, gain, grad, jac);
+
+  float rippleH = 0.0;
+  float foamE = 0.0;
+  vec2 rippleGrad = vec2(0.0);
   #ifdef RIPPLE_FIELD
-  // TODO(Phase 3 §2.2): リップル勾配(4 タップ中心差分)を線形加算 + 域外フェード
+  float rMask = rippleMask(vWorldPos.xz);
+  if (rMask > 0.001) {
+    vec2 ruv = rippleUv(vWorldPos.xz);
+    vec4 rc = texture2D(uRipple, ruv);
+    float hl = texture2D(uRipple, ruv - vec2(uRippleTexelUv, 0.0)).r;
+    float hr = texture2D(uRipple, ruv + vec2(uRippleTexelUv, 0.0)).r;
+    float hd = texture2D(uRipple, ruv - vec2(0.0, uRippleTexelUv)).r;
+    float hu = texture2D(uRipple, ruv + vec2(0.0, uRippleTexelUv)).r;
+    rippleGrad = vec2(hr - hl, hu - hd) / (2.0 * uRippleTexelWorld) * rMask;
+    rippleH = rc.r * rMask;
+    foamE = rc.b * rMask;
+  }
   #endif
-  vec3 n = normalize(vec3(-grad.x, 1.0 - grad.y, -grad.z));
+  vec3 n = normalize(vec3(-(grad.x + rippleGrad.x),
+                          1.0 - grad.y,
+                          -(grad.z + rippleGrad.y)));
   vec3 viewDir = normalize(vWorldPos - cameraPosition);
   float dist = distance(vWorldPos, cameraPosition);
   float facing = max(dot(-viewDir, n), 0.0);
 
-  // 2) フォーム量(Phase 3 §2.4 で foamMask(jac, リップル B)に置換)
+  // 2) フォーム量(Phase 3 §2.4 で foamMask(jac, foamE)に置換)
   float foam = 0.0;
 
   // 3) フレネル(Schlick、水の F0 = 0.02。フォームは粗面 → 反射抑制)
@@ -95,7 +137,7 @@ void main() {
 
   // 6) 波頭の擬似 SSS: 太陽向き視線 × 波頭 × グレージングでターコイズが灯る
   float behindSun = pow(max(dot(viewDir, uSunDir), 0.0), 4.0);
-  float crest = smoothstep(0.15, 0.9, thin); // TODO(Phase 3): + rippleH * 2.5
+  float crest = smoothstep(0.15, 0.9, thin + rippleH * 2.5);
   vec3 sss = uSssColor * (1.6 * behindSun * crest * pow(1.0 - facing, 2.0));
   body += sss;
 

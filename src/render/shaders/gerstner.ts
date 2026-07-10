@@ -73,14 +73,16 @@ uniform float uSwellGain; // 呼吸 1 + 0.15·sin(2π·t/90s)
 /**
  * 共有 GLSL チャンク: 変位(頂点)+ 解析導関数・ヤコビアン(フラグメント)。
  * 両者は同一テーブル・同一位相を読むため整合が構造的に保証される。
+ * gain = uSwellGain × 位置依存の減衰(アクション域スウェル 25% 減 — §2.2)
+ * を呼び元が計算して渡す。
  */
 export const GERSTNER_CHUNK_GLSL = /* glsl */ `
-vec3 gerstnerOffset(vec2 xz, int lo, int hi) {
+vec3 gerstnerOffset(vec2 xz, int lo, int hi, float gain) {
   vec3 off = vec3(0.0);
   for (int i = lo; i < hi; i++) {
     vec2 D = uWaveA[i].xy;
     float w = uWaveA[i].z;
-    float A = uWaveA[i].w * uSwellGain;
+    float A = uWaveA[i].w * gain;
     float th = w * dot(D, xz) + uWaveB[i].y;
     float s = sin(th), c = cos(th);
     // D は vec2(xz 平面)— 第 2 成分が世界 z 方向
@@ -90,14 +92,14 @@ vec3 gerstnerOffset(vec2 xz, int lo, int hi) {
 }
 
 // 法線勾配とヤコビアン(フォーム用)を同一ループで返す — フラグメントで 8 波フル評価
-void gerstnerDeriv(vec2 xz, out vec3 grad, out float jac) {
+void gerstnerDeriv(vec2 xz, float gain, out vec3 grad, out float jac) {
   vec2 dH = vec2(0.0);
   float qs = 0.0;
   float jxx = 1.0, jzz = 1.0, jxz = 0.0;
   for (int i = 0; i < 8; i++) {
     vec2 D = uWaveA[i].xy;
     float w = uWaveA[i].z;
-    float A = uWaveA[i].w * uSwellGain;
+    float A = uWaveA[i].w * gain;
     float Q = uWaveB[i].x;
     float th = w * dot(D, xz) + uWaveB[i].y;
     float s = sin(th), c = cos(th), wA = w * A;
