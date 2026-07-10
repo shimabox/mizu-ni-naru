@@ -1,0 +1,11 @@
+{
+  // sim / contract のヘッドレス性を型レベルで保証する tsconfig。
+  // lib から DOM を排除しているため、sim コアで document / window 等に
+  // 触れるとコンパイルエラーになる(import を伴わない DOM 使用は
+  // dependency-cruiser では構造的に検出できないための二重防御)。
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2022"]
+  },
+  "include": ["src/sim", "src/contract"]
+}

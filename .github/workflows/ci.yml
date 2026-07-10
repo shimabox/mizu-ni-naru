@@ -1,0 +1,47 @@
+name: Run CI
+
+on:
+  push:
+    branches:
+      - main
+      - "feature/**"
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Node.js のバージョンは mise.toml(Node 22)に一元化している。
+      # jdx/mise-action が mise.toml を読んで同じ Node を入れ、PATH に載せる。
+      - name: Set up mise (Node.js 22, pinned in mise.toml)
+        uses: jdx/mise-action@v2
+
+      # package-lock.json は .gitignore 対象(リポジトリにコミットしない)ため、
+      # ロックファイル必須の `npm ci` ではなく `npm install` を使う。
+      - name: Install dependencies
+        run: npm install
+
+      - name: Lint (Biome)
+        run: npm run lint
+
+      # 層境界(contract / sim / render / app)を dependency-cruiser で強制する。
+      - name: Check dependency boundaries (dependency-cruiser)
+        run: npm run depcruise
+
+      # tsconfig.json(DOM あり)と tsconfig.sim.json(DOM 排除でヘッドレス性を保証)
+      # の両方を型検査する。
+      - name: Type-check (tsconfig.json + tsconfig.sim.json)
+        run: npm run typecheck
+
+      - name: Run tests
+        run: npm run test
+
+      # 本番ビルドが通ることも CI で担保する(build は typecheck も内包)。
+      - name: Production build
+        run: npm run build
