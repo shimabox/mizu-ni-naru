@@ -1,5 +1,6 @@
 import {
   ACESFilmicToneMapping,
+  type DataTexture,
   SRGBColorSpace,
   Scene,
   WebGLRenderer,
@@ -8,7 +9,17 @@ import type { SkyRenderView, SkyRenderer } from '../contract/RenderView';
 import { STEP_HZ } from '../contract/WorldSpec';
 import { CameraRig } from './CameraRig';
 import { Environment } from './Environment';
+import { createNoiseTexture } from './NoiseTexture';
+import { PostPipeline } from './PostPipeline';
 import type { FrameInfo, RenderSystem } from './RenderSystem';
+import { AtomSystem } from './atoms/AtomSystem';
+import { AtomViewAttributes } from './atoms/AtomViewAttributes';
+import { DropletSystem } from './atoms/DropletSystem';
+import { LabelSystem } from './atoms/LabelSystem';
+import { BubbleGlassSystem } from './bubbles/BubbleGlassSystem';
+import { BubbleInstanceBuffers } from './bubbles/BubbleInstanceBuffers';
+import { InnerWaterSystem } from './bubbles/InnerWaterSystem';
+import { OceanSystem } from './ocean/OceanSystem';
 
 /** 既定の DPR 上限(Retina 超のフィル爆発防止 — design-render §1.2)。 */
 const DEFAULT_MAX_PIXEL_RATIO = 2;
@@ -21,10 +32,11 @@ export interface SceneRendererOptions {
 }
 
 /**
- * SkyRenderer 実装(design-render §1.2)。Phase 0 は空シーン:
- * 朝スカイ(Environment)+ 自動漂流カメラ(CameraRig)のみ。
- * PostPipeline は Phase 2 — 現状は composer なしの直接レンダ
- * (ACES + sRGB は renderer 設定でキャンバス出力時に適用される)。
+ * SkyRenderer 実装(design-render §1.2)。
+ *
+ * Phase 2: PostPipeline(HDR HalfFloat → bloom → output+vignette)経由の
+ * 描画に移行。共有ノイズテクスチャ(NoiseTexture)と太陽 uniform
+ * (Environment 単一所有)を全サブシステムに配る。
  */
 export class SceneRenderer implements SkyRenderer {
   private readonly renderer: WebGLRenderer;
@@ -32,6 +44,10 @@ export class SceneRenderer implements SkyRenderer {
   private readonly cameraRig: CameraRig;
   private readonly systems: RenderSystem[] = [];
   private readonly maxPixelRatio: number;
+  private readonly noiseTexture: DataTexture;
+  private readonly post: PostPipeline;
+  private readonly bubbleBuffers: BubbleInstanceBuffers;
+  private readonly atomAttributes: AtomViewAttributes;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -52,9 +68,32 @@ export class SceneRenderer implements SkyRenderer {
 
     this.scene = new Scene();
     this.cameraRig = new CameraRig({ parallax: options?.parallax ?? true });
+    this.noiseTexture = createNoiseTexture();
 
-    const environment = new Environment();
+    const environment = new Environment(this.noiseTexture);
     this.addSystem(environment);
+    this.addSystem(new OceanSystem(environment.sunUniforms, this.noiseTexture));
+    this.atomAttributes = new AtomViewAttributes();
+    this.addSystem(new AtomSystem(this.atomAttributes));
+    this.addSystem(new DropletSystem(environment.sunUniforms));
+    this.addSystem(new LabelSystem(this.atomAttributes));
+    this.bubbleBuffers = new BubbleInstanceBuffers();
+    this.addSystem(
+      new InnerWaterSystem(
+        environment.sunUniforms,
+        this.bubbleBuffers,
+        this.noiseTexture,
+      ),
+    );
+    this.addSystem(
+      new BubbleGlassSystem(environment.sunUniforms, this.bubbleBuffers),
+    );
+
+    this.post = new PostPipeline(
+      this.renderer,
+      this.scene,
+      this.cameraRig.camera,
+    );
 
     this.resize();
   }
@@ -68,19 +107,26 @@ export class SceneRenderer implements SkyRenderer {
       timeSec: stepF / STEP_HZ,
     };
     this.cameraRig.update(frame.timeSec);
+    // 7 球の CPU 距離ソート + 共有インスタンス属性の一括アップロード(§1.3)
+    this.bubbleBuffers.sync(view, this.cameraRig.camera);
+    // AtomView のゼロコピー属性(AtomSystem / LabelSystem 共有)
+    this.atomAttributes.sync(view);
     for (const system of this.systems) {
       system.update(view, frame);
     }
-    this.renderer.render(this.scene, this.cameraRig.camera);
+    for (const system of this.systems) {
+      system.prerender?.(this.renderer);
+    }
+    this.post.render();
   }
 
   public resize(): void {
     const width = this.canvas.clientWidth || window.innerWidth;
     const height = this.canvas.clientHeight || window.innerHeight;
-    this.renderer.setPixelRatio(
-      Math.min(window.devicePixelRatio, this.maxPixelRatio),
-    );
+    const pixelRatio = Math.min(window.devicePixelRatio, this.maxPixelRatio);
+    this.renderer.setPixelRatio(pixelRatio);
     this.renderer.setSize(width, height, false);
+    this.post.setSize(width, height, pixelRatio);
     this.cameraRig.setAspect(width / height);
   }
 
@@ -88,6 +134,8 @@ export class SceneRenderer implements SkyRenderer {
     for (const system of this.systems) {
       system.dispose();
     }
+    this.post.dispose();
+    this.noiseTexture.dispose();
     this.cameraRig.dispose();
     this.renderer.dispose();
   }
