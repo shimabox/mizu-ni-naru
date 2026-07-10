@@ -28,7 +28,7 @@ const DEFAULT_MAX_PIXEL_RATIO = 2;
 export interface SceneRendererOptions {
   /** DPR 上限(`?dpr=` — 実効 DPR = min(devicePixelRatio, これ))。 */
   readonly maxPixelRatio?: number;
-  /** false でマウス視差を無効化(`?m=1`)。 */
+  /** false でマウス視差・ドラッグ/ズーム操作を無効化(`?m=1`)。 */
   readonly parallax?: boolean;
 }
 
@@ -68,7 +68,10 @@ export class SceneRenderer implements SkyRenderer {
     this.maxPixelRatio = options?.maxPixelRatio ?? DEFAULT_MAX_PIXEL_RATIO;
 
     this.scene = new Scene();
-    this.cameraRig = new CameraRig({ parallax: options?.parallax ?? true });
+    this.cameraRig = new CameraRig({
+      parallax: options?.parallax ?? true,
+      domElement: canvas,
+    });
     this.noiseTexture = createNoiseTexture();
 
     const environment = new Environment(this.noiseTexture);
