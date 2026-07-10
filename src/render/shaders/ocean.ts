@@ -1,5 +1,5 @@
 import { GERSTNER_CHUNK_GLSL, GERSTNER_UNIFORMS_GLSL } from './gerstner';
-import { MIZU_BLUE_GLSL } from './glass';
+import { IRID_CHUNK_GLSL, MIZU_BLUE_GLSL } from './glass';
 import { SKY_CHUNK_GLSL, SKY_UNIFORMS_GLSL } from './sky';
 
 /**
@@ -76,8 +76,9 @@ uniform vec3 uSssColor;    // #2fc0a8 ターコイズ
 uniform vec3 uFoamColor;   // #eef7f5
 
 #ifdef ANALYTIC_REFLECTIONS
-// TODO(Phase 3 §2.5): uniform vec4 uBubblePosR[8]; uniform vec4 uBubbleMisc[8];
-// uniform int uBubbleCount; + vec3 reflectEnv(vec3 ro, vec3 rd)
+uniform vec4 uBubblePosR[8];  // [cx, cy, cz, R_visual](補間 + 状態変形済み)
+uniform vec4 uBubbleMisc[8];  // [waterLevelYLocal/R, fill01, seed, fade]
+uniform int uBubbleCount;
 #endif
 
 varying vec3 vWorldPos;
@@ -86,6 +87,49 @@ varying float vWaveY;
 ${SKY_CHUNK_GLSL}
 ${GERSTNER_CHUNK_GLSL}
 ${MIZU_BLUE_GLSL}
+${IRID_CHUNK_GLSL}
+
+#ifdef ANALYTIC_REFLECTIONS
+// ≤7 球の閉形式レイ交差(§2.5)— 海面が揺れているため反射像は自然に歪む。
+// リム + 虹彩 + 内水の青の 3 要素で「球が映っている」と読めれば十分。
+// 動的 index を避けるためヒット時に値をコピーする(ESSL への安全策)。
+vec3 reflectEnv(vec3 ro, vec3 rd) {
+  vec3 env = sky(rd);
+  float bestT = 1e9;
+  vec3 hitCenter = vec3(0.0);
+  float hitR = 1.0;
+  vec4 hitMisc = vec4(0.0);
+  for (int i = 0; i < 8; i++) {
+    if (i >= uBubbleCount) break;
+    vec3 oc = ro - uBubblePosR[i].xyz;
+    float b = dot(oc, rd);
+    float c = dot(oc, oc) - uBubblePosR[i].w * uBubblePosR[i].w;
+    float disc = b * b - c;
+    if (disc > 0.0) {
+      float t = -b - sqrt(disc);
+      if (t > 0.0 && t < bestT) {
+        bestT = t;
+        hitCenter = uBubblePosR[i].xyz;
+        hitR = uBubblePosR[i].w;
+        hitMisc = uBubbleMisc[i];
+      }
+    }
+  }
+  if (bestT < 1e8) {
+    vec3 p = ro + rd * bestT;
+    vec3 n = (p - hitCenter) / hitR;
+    float rim = pow(1.0 - abs(dot(n, -rd)), 2.0);
+    vec3 glassy = sky(reflect(rd, n)) * 0.35
+                + irid(rim * 2.0 + hitMisc.z * 0.61) * rim * 0.35;
+    // 内水面(n.y < wl/R)には #007fff の青が映る
+    float water = smoothstep(hitMisc.x + 0.05, hitMisc.x - 0.2, n.y);
+    glassy = mix(glassy, MIZU_BLUE * 0.5, water * 0.55);
+    env = mix(env, glassy + sky(rd) * 0.25,
+              clamp(rim + 0.35, 0.0, 1.0) * hitMisc.w);
+  }
+  return env;
+}
+#endif
 
 void main() {
   // 1) 法線: 8 波解析導関数 + リップル勾配の線形加算(§2.1 / §2.2)
@@ -133,10 +177,14 @@ void main() {
   // 3) フレネル(Schlick、水の F0 = 0.02。フォームは粗面 → 反射抑制)
   float fresnel = (0.02 + 0.98 * pow(1.0 - facing, 5.0)) * (1.0 - 0.85 * foam);
 
-  // 4) 反射 = 解析スカイ(Phase 3 で解析的球面反射 reflectEnv を追加)
+  // 4) 反射 = 解析スカイ + 解析的球面反射(§2.5、ANALYTIC_REFLECTIONS)
   vec3 rdir = reflect(viewDir, n);
   rdir.y = abs(rdir.y);              // 水面下向き反射レイの黒ずみ防止
+  #ifdef ANALYTIC_REFLECTIONS
+  vec3 reflected = reflectEnv(vWorldPos, rdir);
+  #else
   vec3 reflected = sky(rdir);
+  #endif
 
   // 5) 水体色: Beer-Lambert 近似(視線角プロキシ)+ 波高で青緑へ
   vec3 body = mix(uMidColor, uDeepColor, pow(facing, 0.6));
