@@ -12,6 +12,7 @@ import { Environment } from './Environment';
 import { createNoiseTexture } from './NoiseTexture';
 import { PostPipeline } from './PostPipeline';
 import type { FrameInfo, RenderSystem } from './RenderSystem';
+import { OceanSystem } from './ocean/OceanSystem';
 
 /** 既定の DPR 上限(Retina 超のフィル爆発防止 — design-render §1.2)。 */
 const DEFAULT_MAX_PIXEL_RATIO = 2;
@@ -62,6 +63,7 @@ export class SceneRenderer implements SkyRenderer {
 
     const environment = new Environment();
     this.addSystem(environment);
+    this.addSystem(new OceanSystem(environment.sunUniforms, this.noiseTexture));
 
     this.post = new PostPipeline(
       this.renderer,
