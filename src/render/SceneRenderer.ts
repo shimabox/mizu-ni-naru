@@ -14,6 +14,7 @@ import { PostPipeline } from './PostPipeline';
 import type { FrameInfo, RenderSystem } from './RenderSystem';
 import { BubbleGlassSystem } from './bubbles/BubbleGlassSystem';
 import { BubbleInstanceBuffers } from './bubbles/BubbleInstanceBuffers';
+import { InnerWaterSystem } from './bubbles/InnerWaterSystem';
 import { OceanSystem } from './ocean/OceanSystem';
 
 /** 既定の DPR 上限(Retina 超のフィル爆発防止 — design-render §1.2)。 */
@@ -68,6 +69,13 @@ export class SceneRenderer implements SkyRenderer {
     this.addSystem(environment);
     this.addSystem(new OceanSystem(environment.sunUniforms, this.noiseTexture));
     this.bubbleBuffers = new BubbleInstanceBuffers();
+    this.addSystem(
+      new InnerWaterSystem(
+        environment.sunUniforms,
+        this.bubbleBuffers,
+        this.noiseTexture,
+      ),
+    );
     this.addSystem(
       new BubbleGlassSystem(environment.sunUniforms, this.bubbleBuffers),
     );
