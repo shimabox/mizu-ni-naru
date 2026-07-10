@@ -58,14 +58,40 @@ void main() {
 }
 `;
 
-/** スカイ背景のフラグメントシェーダ(トーンマップ+色空間変換は three のチャンクに委譲)。 */
+/**
+ * スカイ背景のフラグメントシェーダ(トーンマップ+色空間変換は three のチャンクに委譲)。
+ * `#define SKY_BACKDROP` 時のみ、焼き込みノイズ(B: リッジ)を方向射影 UV で
+ * サンプルし、地平線近くに薄い雲気を漂わせる(2 fetch — design-render §7)。
+ * 反射・フォグに使う共有 sky() はノイズなしの軽量核のまま。
+ */
 export const SKY_FRAGMENT_GLSL = /* glsl */ `
+precision highp float;
 ${SKY_UNIFORMS_GLSL}
 ${SKY_CHUNK_GLSL}
+#ifdef SKY_BACKDROP
+uniform sampler2D uNoise;
+uniform float uTimeSec;
+#endif
 varying vec3 vDir;
 
 void main() {
-  gl_FragColor = vec4(sky(normalize(vDir)), 1.0);
+  vec3 dir = normalize(vDir);
+  vec3 col = sky(dir);
+
+  #ifdef SKY_BACKDROP
+  // 雲気: ごく薄い気配だけ(§0 Look)。地平線 h ∈ [0.02, 0.35] の帯
+  float h = dir.y;
+  float band = smoothstep(0.02, 0.08, h) * (1.0 - smoothstep(0.10, 0.35, h));
+  if (band > 0.001) {
+    vec2 cuv = dir.xz / max(h + 0.12, 0.12);
+    float c1 = texture2D(uNoise, cuv * 0.055 + vec2(uTimeSec * 0.0011, 0.0)).b;
+    float c2 = texture2D(uNoise, cuv * 0.021 - vec2(0.0, uTimeSec * 0.0007)).b;
+    float cloud = smoothstep(0.55, 0.95, c1 * 0.6 + c2 * 0.55);
+    col += vec3(0.05, 0.047, 0.042) * cloud * band;
+  }
+  #endif
+
+  gl_FragColor = vec4(col, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }

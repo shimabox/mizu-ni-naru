@@ -70,7 +70,7 @@ export class SceneRenderer implements SkyRenderer {
     this.cameraRig = new CameraRig({ parallax: options?.parallax ?? true });
     this.noiseTexture = createNoiseTexture();
 
-    const environment = new Environment();
+    const environment = new Environment(this.noiseTexture);
     this.addSystem(environment);
     this.addSystem(new OceanSystem(environment.sunUniforms, this.noiseTexture));
     this.atomAttributes = new AtomViewAttributes();

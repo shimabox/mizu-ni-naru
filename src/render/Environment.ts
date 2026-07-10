@@ -2,6 +2,7 @@ import {
   BufferAttribute,
   BufferGeometry,
   Color,
+  type DataTexture,
   LessEqualDepth,
   Matrix4,
   Mesh,
@@ -38,7 +39,7 @@ export class Environment implements RenderSystem {
   private readonly material: ShaderMaterial;
   private readonly geometry: BufferGeometry;
 
-  constructor() {
+  constructor(noiseTexture?: DataTexture) {
     this.sunUniforms = {
       // 仰角 14°(y = sin14° ≈ 0.242)。方位は構図固定
       uSunDir: { value: new Vector3(0.485, 0.242, -0.841).normalize() },
@@ -66,6 +67,12 @@ export class Environment implements RenderSystem {
       depthTest: true,
       depthFunc: LessEqualDepth,
     });
+    if (noiseTexture) {
+      // 雲気(バックドロップ専用 — 共有 sky() は軽量核のまま。design-render §7)
+      this.material.defines = { SKY_BACKDROP: '' };
+      this.material.uniforms.uNoise = { value: noiseTexture };
+      this.material.uniforms.uTimeSec = { value: 0 };
+    }
 
     this.object = new Mesh(this.geometry, this.material);
     this.object.renderOrder = 3;
@@ -80,8 +87,10 @@ export class Environment implements RenderSystem {
     };
   }
 
-  public update(_view: SkyRenderView, _frame: FrameInfo): void {
-    // 太陽は不動・行列は onBeforeRender で同期 — フレーム更新なし
+  public update(_view: SkyRenderView, frame: FrameInfo): void {
+    // 太陽は不動・行列は onBeforeRender で同期。雲気のみゆっくり流れる
+    const uTimeSec = this.material.uniforms.uTimeSec;
+    if (uTimeSec) uTimeSec.value = frame.timeSec;
   }
 
   public dispose(): void {
