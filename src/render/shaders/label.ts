@@ -36,8 +36,12 @@ void main() {
   // カメラ方向へわずかに浮かせる(雫や球内水面との前後を安定させる)
   vec3 toCam = normalize(cameraPosition - center);
   vec3 base = center + toCam * (0.6 * r);
+  // 種別ごとの視覚スケール: sim の r は H2 が H の 1.5 倍だが、文字の
+  // 存在感としては過大なので H2(kindIndex=2)のみ 0.77 倍に補正
+  // (1.5 × 0.77 ≈ 1.15 — H の約 1.15 倍の見た目に収める)。
+  float kindScale = mix(1.0, 0.77, step(1.5, aColorKind.w));
   // 文字そのものが原子の本体 — 旧「球 + ラベル」と同程度の存在感
-  float half_ = 2.0 * r * fadeIn;
+  float half_ = 2.0 * r * kindScale * fadeIn;
   vec3 wp = base + (uCamRight * position.x + uCamUp * position.y) * half_;
 
   // セル選択: アトラスは横 4 セル(セル順 = KIND_INDEX)
