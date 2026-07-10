@@ -1,7 +1,11 @@
 import {
   ANGLE_JITTER,
+  FALLBACK_Y_INNER,
+  FALLBACK_Y_OUTER,
+  INNER_RING_SHARE,
   RADIAL_JITTER,
-  RING_RADIUS,
+  RING_INNER_RADIUS,
+  RING_OUTER_RADIUS,
   RING_Y_MAX,
   RING_Y_MIN,
   R_MAX,
@@ -32,22 +36,29 @@ export const emptyPlacement = (): SlotPlacement => ({
 });
 
 /**
- * リング配置とスポーン時の決定的分離チェック(design-sim §2.3)。
- * - スロット i の基準角 θᵢ = 2πi/slotCount。アンカーは中心軸まわりの緩いリング
- *   (半径 4.5 u、y ∈ [2.8, 5.2]、角 ±0.06 rad・半径 ±0.25 u ジッター)
- * - 分離チェック: 他スロットとの中心距離 ≥ R_a + R_b + 0.1 になるまで
- *   (角, 半径, y)を再ロール(最大 8 回)。全滅時はジッターなし基準位置 +
- *   帯中央の y(決定的フォールバック)
+ * 緩い二重リング配置とスポーン時の決定的分離チェック(design-sim §2.3、A30)。
+ * - スロットは前詰めで内リング(innerCount = round(slotCount·5/12))と
+ *   外リングに分割: desktop 12 = 内 5 + 外 7、mobile 7 = 内 3 + 外 4
+ * - 内リング i: 基準角 θᵢ = 2πi/innerCount(半径 3.5)。
+ *   外リング j: θⱼ = 2πj/outerCount + π/outerCount(半径 6.5 — 半ステップ
+ *   オフセットで格子の重なりを最小化)。y ∈ [2.6, 6.0]、
+ *   角 ±0.06 rad・半径 ±0.25 u ジッター
+ * - 分離チェック: 他スロット(リング横断)との中心距離 ≥ R_a + R_b + 0.1 に
+ *   なるまで(角, 半径, y)を再ロール(最大 16 回)。全滅時はジッターなし
+ *   基準位置 + リング別 y(内 2.9 / 外 5.7 — フォールバック同士も分離する
+ *   決定的最終手段)
  * - RNG 呼び順(§7.1): R → (角, 半径, y) × 試行 → bob 位相 ×2。
  *   初期 fill ジッターは呼び出し側(init のみ)
  */
 export class SlotRing {
-  private readonly slotCount: number;
+  private readonly innerCount: number;
+  private readonly outerCount: number;
   /** 候補点の使い回しバッファ(定常アロケーションゼロ)。 */
   private readonly candidate: Vec3 = vec3();
 
   constructor(slotCount: number) {
-    this.slotCount = slotCount;
+    this.innerCount = Math.round(slotCount * INNER_RING_SHARE);
+    this.outerCount = slotCount - this.innerCount;
   }
 
   /**
@@ -60,16 +71,22 @@ export class SlotRing {
     others: readonly (SlotPlacement | null)[],
     out: SlotPlacement,
   ): void {
-    const theta0 = (2 * Math.PI * slotIndex) / this.slotCount;
+    const inner = slotIndex < this.innerCount;
+    const ringCount = inner ? this.innerCount : this.outerCount;
+    const ringIndex = inner ? slotIndex : slotIndex - this.innerCount;
+    const ringRadius = inner ? RING_INNER_RADIUS : RING_OUTER_RADIUS;
+    const theta0 =
+      (2 * Math.PI * ringIndex) / ringCount +
+      (inner ? 0 : Math.PI / this.outerCount);
     const r = R_MIN + rng.next() * (R_MAX - R_MIN);
-    // フォールバック: ジッターなし基準位置 + 帯中央 y(全試行失敗時 — 決定的)
+    // フォールバック: ジッターなし基準位置 + リング別 y(全試行失敗時 — 決定的)
     const p = this.candidate;
-    p.x = RING_RADIUS * Math.cos(theta0);
-    p.y = (RING_Y_MIN + RING_Y_MAX) / 2;
-    p.z = RING_RADIUS * Math.sin(theta0);
+    p.x = ringRadius * Math.cos(theta0);
+    p.y = inner ? FALLBACK_Y_INNER : FALLBACK_Y_OUTER;
+    p.z = ringRadius * Math.sin(theta0);
     for (let t = 0; t < SEPARATION_MAX_TRIES; t++) {
       const theta = theta0 + (2 * rng.next() - 1) * ANGLE_JITTER;
-      const radius = RING_RADIUS + (2 * rng.next() - 1) * RADIAL_JITTER;
+      const radius = ringRadius + (2 * rng.next() - 1) * RADIAL_JITTER;
       const cy = RING_Y_MIN + rng.next() * (RING_Y_MAX - RING_Y_MIN);
       const cx = radius * Math.cos(theta);
       const cz = radius * Math.sin(theta);

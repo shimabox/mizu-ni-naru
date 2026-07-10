@@ -11,7 +11,11 @@ import {
   gerstnerAngularWavenumber,
   gerstnerPhaseRate,
 } from '../shaders/gerstner';
-import { OCEAN_FRAGMENT_GLSL, OCEAN_VERTEX_GLSL } from '../shaders/ocean';
+import {
+  MAX_REFLECT_BUBBLES,
+  OCEAN_FRAGMENT_GLSL,
+  OCEAN_VERTEX_GLSL,
+} from '../shaders/ocean';
 import { OceanGeometryCache } from './OceanGeometry';
 import type { RippleUniforms } from './RippleField';
 
@@ -44,6 +48,9 @@ export class OceanSystem implements RenderSystem {
   private readonly phaseRates: number[];
   private readonly bubblePosR: Vector4[];
   private readonly bubbleMisc: Vector4[];
+  /** 近傍選抜のスクラッチ(候補スロット番号と d² — 定常アロケーションゼロ)。 */
+  private readonly candSlot = new Int32Array(BUBBLE_CAPACITY);
+  private readonly candD2 = new Float64Array(BUBBLE_CAPACITY);
 
   constructor(
     sun: SunUniforms,
@@ -120,23 +127,60 @@ export class OceanSystem implements RenderSystem {
     for (let i = 0; i < GERSTNER_WAVE_COUNT; i++) {
       this.waveB[i].y = (this.phaseRates[i] * t) % TWO_PI;
     }
-    uniforms.uBubbleCount.value = this.packBubbles(view, frame.alpha);
+    uniforms.uBubbleCount.value = this.packBubbles(view, frame);
   }
 
   /**
-   * 解析反射の球 uniform(§2.5)。prev/curr 補間 + 状態変形(Spawning の
+   * 解析反射の球 uniform(§2.5 / A30)。prev/curr 補間 + 状態変形(Spawning の
    * スケールイン / Splashing の膨張・フェード)を CPU で適用し、
    * 見た目半径 R_visual と fade を渡す。Dead は除外。
+   * 容量 16 のうちカメラに近い ≤8 球を毎フレーム CPU 選抜(uniform 詰め替えのみ
+   * — 描画コスト維持のためシェーダのループは 8 固定)。
    */
-  private packBubbles(view: SkyRenderView, alpha: number): number {
+  private packBubbles(view: SkyRenderView, frame: FrameInfo): number {
+    const alpha = frame.alpha;
+    const cam = frame.camera.position;
     const bubbles = view.bubbles;
     const count = Math.min(bubbles.count, BUBBLE_CAPACITY);
-    let n = 0;
+    // 候補収集(alive のみ)+ カメラ距離²
+    let candidates = 0;
     for (let slot = 0; slot < count; slot++) {
       const o = slot * 8;
       const statePacked = bubbles.data[o + 7]; // curr のみ(prev lerp 禁止)
       const state = Math.floor(statePacked);
       if (state === BUBBLE_STATE.Dead) continue;
+      const prog = statePacked - state;
+      const fade = state === BUBBLE_STATE.Splashing ? 1 - prog : 1;
+      if (fade <= 1e-3) continue;
+      const dx = lerp(bubbles.prevData[o], bubbles.data[o], alpha) - cam.x;
+      const dy =
+        lerp(bubbles.prevData[o + 1], bubbles.data[o + 1], alpha) - cam.y;
+      const dz =
+        lerp(bubbles.prevData[o + 2], bubbles.data[o + 2], alpha) - cam.z;
+      this.candSlot[candidates] = slot;
+      this.candD2[candidates] = dx * dx + dy * dy + dz * dz;
+      candidates++;
+    }
+    // 近い順の部分選択(挿入ソート — 候補 ≤16 なので全ソートで十分安い)
+    for (let i = 1; i < candidates; i++) {
+      const slot = this.candSlot[i];
+      const d2 = this.candD2[i];
+      let j = i - 1;
+      while (j >= 0 && this.candD2[j] > d2) {
+        this.candSlot[j + 1] = this.candSlot[j];
+        this.candD2[j + 1] = this.candD2[j];
+        j--;
+      }
+      this.candSlot[j + 1] = slot;
+      this.candD2[j + 1] = d2;
+    }
+    const selected = Math.min(candidates, MAX_REFLECT_BUBBLES);
+    let n = 0;
+    for (let k = 0; k < selected; k++) {
+      const slot = this.candSlot[k];
+      const o = slot * 8;
+      const statePacked = bubbles.data[o + 7];
+      const state = Math.floor(statePacked);
       const prog = statePacked - state;
       const grow =
         state === BUBBLE_STATE.Spawning
@@ -146,7 +190,7 @@ export class OceanSystem implements RenderSystem {
       const fade = state === BUBBLE_STATE.Splashing ? 1 - prog : 1;
       const r = lerp(bubbles.prevData[o + 3], bubbles.data[o + 3], alpha);
       const rVisual = r * grow * pop;
-      if (rVisual <= 1e-4 || fade <= 1e-3) continue;
+      if (rVisual <= 1e-4) continue;
       this.bubblePosR[n].set(
         lerp(bubbles.prevData[o], bubbles.data[o], alpha),
         lerp(bubbles.prevData[o + 1], bubbles.data[o + 1], alpha),

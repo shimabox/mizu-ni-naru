@@ -10,8 +10,8 @@ const STRIDE = 8;
 const V4 = 4;
 
 /**
- * 7 球の CPU 距離ソート(design-render §1.3)— 遠→近のインスタンス順。
- * αブレンドの正順(painter's order)。挿入ソート・割付なし(≤8 要素)。
+ * 12 球の CPU 距離ソート(design-render §1.3)— 遠→近のインスタンス順。
+ * αブレンドの正順(painter's order)。挿入ソート・割付なし(≤16 要素)。
  * 純ロジック(テスト対象)。outOrder には count 個のスロット番号が書かれる。
  */
 export const sortBubblesFarToNear = (

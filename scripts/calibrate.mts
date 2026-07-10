@@ -10,8 +10,9 @@
  * - 落下間隔: シーン全体で SplashEvent 間の実時間(全 splash)
  * - 体積シェア: 雫吸収 vs 原子/H2 溶解が運んだ水体積の比
  *
- * 受入バンド(master-plan §7 Phase 1): T_fill ∈ [90, 150] s、
- * 落下間隔(平均)∈ [15, 25] s。外れた場合のノブ優先順位:
+ * 受入バンド(A30 改訂): T_fill ∈ [90, 150] s、落下間隔(平均)は
+ * desktop(12 球)∈ [11, 20] s / mobile(7 球)∈ [15, 25] s。
+ * 外れた場合のノブ優先順位:
  * ① SPAWN_INTERVAL_STEPS(線形で効く)② VOLUME_GAIN(粒数を変えず時間だけ動く)
  * ③ P_DISSOLVE(シェア補正)。
  */
@@ -115,9 +116,9 @@ const main = (): void => {
   const { seconds, seeds, out } = parseArgs();
   mkdirSync(out, { recursive: true });
 
-  const presets: { name: string; slots: number }[] = [
-    { name: 'desktop', slots: 7 },
-    { name: 'mobile', slots: 5 },
+  const presets: { name: string; slots: number; ivBand: [number, number] }[] = [
+    { name: 'desktop', slots: 12, ivBand: [11, 20] },
+    { name: 'mobile', slots: 7, ivBand: [15, 25] },
   ];
   const results: RunResult[] = [];
   for (const p of presets) {
@@ -183,13 +184,13 @@ const main = (): void => {
     const share =
       merged.reduce((a, r) => a + r.dropletShare, 0) / merged.length;
     const tfillOk = tf.mean >= 90 && tf.mean <= 150;
-    const ivOk = iv.mean >= 15 && iv.mean <= 25;
+    const ivOk = iv.mean >= p.ivBand[0] && iv.mean <= p.ivBand[1];
     if (p.name === 'desktop' && (!tfillOk || !ivOk)) allPass = false;
     console.log(
       `${p.name}(${p.slots} 球): T_fill mean=${fmt(tf.mean)}s median=${fmt(tf.median)}s ` +
         `[${fmt(tf.min)}, ${fmt(tf.max)}] n=${tf.n} → ${tfillOk ? 'PASS' : 'FAIL'} (band 90–150)\n` +
         `  落下間隔 mean=${fmt(iv.mean)}s median=${fmt(iv.median)}s [${fmt(iv.min)}, ${fmt(iv.max)}] n=${iv.n} ` +
-        `→ ${ivOk ? 'PASS' : 'FAIL'} (band 15–25)\n` +
+        `→ ${ivOk ? 'PASS' : 'FAIL'} (band ${p.ivBand[0]}–${p.ivBand[1]})\n` +
         `  体積シェア: 雫 ${(share * 100).toFixed(1)}% / 溶解 ${((1 - share) * 100).toFixed(1)}%(設計 85/15)`,
     );
   }

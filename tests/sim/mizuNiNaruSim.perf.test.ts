@@ -8,9 +8,9 @@ import { MizuNiNaruSim } from '../../src/sim/MizuNiNaruSim';
  * CI ゲートの厳密な性能測定には使わない。
  */
 describe('MizuNiNaruSim perf(トリップワイヤ)', () => {
-  it('7 球 × 3000 step が寛大な上限(3000ms = 1ms/step)以内', () => {
+  it('12 球 × 3000 step が寛大な上限(3000ms = 1ms/step)以内', () => {
     const sim = new MizuNiNaruSim();
-    sim.init({ seed: 7, slotCount: 7 });
+    sim.init({ seed: 7, slotCount: 12 });
     // ウォームアップ(JIT)
     for (let s = 0; s < 300; s++) sim.step();
     const t0 = performance.now();

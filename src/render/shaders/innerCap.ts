@@ -1,6 +1,10 @@
+import { BUBBLE_CAPACITY } from '../../contract/WorldSpec';
 import { BUBBLE_INSTANCE_VERTEX_PARS_GLSL, MIZU_BLUE_GLSL } from './glass';
 import { BUBBLE_STATE_TRANSFORM_GLSL, WATER_VISUAL_RATIO } from './innerWater';
 import { SKY_CHUNK_GLSL, SKY_UNIFORMS_GLSL } from './sky';
+
+/** 球ごとの InnerRipple リングバッファ本数(§4b — InnerWaterSystem と共有)。 */
+export const RIPPLES_PER_BUBBLE = 6;
 
 /**
  * 球内水面キャップ — ミニ海(design-render §4b)。
@@ -61,7 +65,7 @@ precision highp float;
 ${SKY_UNIFORMS_GLSL}
 uniform float uStepF;
 uniform vec3 uSssColor;
-uniform vec4 uInnerRipples[48];  // [x, z, birthStepF, strength] × 8 球 × 6 本
+uniform vec4 uInnerRipples[${BUBBLE_CAPACITY * RIPPLES_PER_BUBBLE}];  // [x, z, birthStepF, strength] × 16 球 × 6 本
 varying vec3 vWorldPos;
 varying vec2 vCapLocal;
 varying float vRadial;

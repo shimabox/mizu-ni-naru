@@ -17,9 +17,9 @@ const RETURN_TAU_S = 1.8;
 const ORBIT_RAD_PER_PX = 0.005;
 /** ホイール 1 ノッチ(≈100)で距離 ≈ ×1.13。 */
 const ZOOM_LOG_PER_WHEEL = 0.0012;
-/** ズーム距離クランプ(u)。下限はリング外周の球に潜り込まない距離、上限は海が主役のまま。 */
-const DIST_MIN = 8.0;
-const DIST_MAX = 24;
+/** ズーム距離クランプ(u)。下限は外リング(6.5 + R_MAX)の球に潜り込まない距離、上限は海が主役のまま。 */
+const DIST_MIN = 9.0;
+const DIST_MAX = 28;
 /** 極角クランプ(rad)。上限は水面下潜行防止と併用(camera y ≥ MIN_CAMERA_Y)。 */
 const POLAR_MIN = 0.15;
 const POLAR_MAX = Math.PI * 0.58;
@@ -47,7 +47,7 @@ export interface CameraRigOptions {
  *   操作中〜復帰完了までは無効(非操作時のみ — A28)
  * - prefers-reduced-motion: ドリフト t を凍結+視差無効(従来どおり)。
  *   ドラッグはユーザー起点の操作なので許可
- * - 水面下防止: 基準軌道は y(t) 最小 3.74 で構造的に潜らず、操作時は
+ * - 水面下防止: 基準軌道は y(t) − Δpos.y 最小 4.5 で構造的に潜らず、操作時は
  *   極角クランプ + camera y ≥ 1.2 の距離依存クランプで保証
  */
 export class CameraRig {
@@ -160,14 +160,16 @@ export class CameraRig {
 
     const t = this.reducedMotion ? REDUCED_MOTION_FREEZE_T : timeSec;
 
-    // 基準軌道(周期はすべて非整数比 — 240/97/61/91/53/73 s)
+    // 基準軌道(周期はすべて非整数比 — 240/97/61/91/53/73 s)。
+    // 基準距離 13.2 は外リング 6.5 + R_MAX 1.7 の再フレーミング(A30 — 旧 10.0 を
+    // リング拡大比 ≈8.2/6.2 でスケール)。全球収容は非目標(A21 — 海が主役)
     const azimuth = (TWO_PI * t) / 240;
-    const radius = 10.0 + 0.8 * Math.sin((TWO_PI * t) / 97);
-    const height = 4.6 + 0.6 * Math.sin((TWO_PI * t) / 61 + 1.3);
+    const radius = 13.2 + 1.0 * Math.sin((TWO_PI * t) / 97);
+    const height = 5.4 + 0.7 * Math.sin((TWO_PI * t) / 61 + 1.3);
     this.target.set(
-      0.4 * Math.sin((TWO_PI * t) / 91),
-      3.7 + 0.25 * Math.sin((TWO_PI * t) / 53),
-      0.4 * Math.cos((TWO_PI * t) / 73),
+      0.5 * Math.sin((TWO_PI * t) / 91),
+      4.0 + 0.25 * Math.sin((TWO_PI * t) / 53),
+      0.5 * Math.cos((TWO_PI * t) / 73),
     );
 
     // ── オービットオフセットの適用と復帰(A28)

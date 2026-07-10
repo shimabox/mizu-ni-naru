@@ -28,9 +28,11 @@ const F_FULL = 0.6;
 const FILL_PER_STEP = F_FULL / (20 * 60); // Drifting で 0 → 0.6 を約 20 s
 const INITIAL_FILL_MAX = 0.55; // 初期スタッガー(design-sim §2.5)
 
-const RING_RADIUS = 4.5;
-const RING_Y_MIN = 2.8;
-const RING_Y_MAX = 5.2;
+// 二重リングの簡易近似(A30 — 本 sim の SlotRing と違い偶奇で振り分けるだけ)
+const RING_RADIUS_INNER = 3.5;
+const RING_RADIUS_OUTER = 6.5;
+const RING_Y_MIN = 2.6;
+const RING_Y_MAX = 6.0;
 const R_MIN = 1.1;
 const R_MAX = 1.7;
 const SHELL_RATIO = 0.94; // R_inner = 0.94R(A13)
@@ -375,7 +377,9 @@ export class StubSim implements SimLike {
     const n = this.slotCount;
     const r = R_MIN + rng.next() * (R_MAX - R_MIN);
     const theta = (2 * Math.PI * index) / n + (rng.next() - 0.5) * 0.12;
-    const radius = RING_RADIUS + (rng.next() - 0.5) * 0.5;
+    const radius =
+      (index % 2 === 0 ? RING_RADIUS_INNER : RING_RADIUS_OUTER) +
+      (rng.next() - 0.5) * 0.5;
     const baseY = RING_Y_MIN + rng.next() * (RING_Y_MAX - RING_Y_MIN);
     const bobPhase = rng.next() * 2 * Math.PI;
     // 初期 fill スタッガー(design-sim §2.5)。再生成時は 0 から

@@ -77,45 +77,49 @@ const runGolden = (slotCount: number): GoldenRecord => {
   };
 };
 
-/** 記録値(seed=7・1800 step)。再記録時は上の手順コメントを読むこと。 */
+/**
+ * 記録値(seed=7・1800 step)。再記録時は上の手順コメントを読むこと。
+ * 2026-07-11 再記録: A30(12/7 球・二重リング SlotRing)で配置の RNG 消費と
+ * スロット数が意図して変わったため(変更管理手順に基づく再記録)。
+ */
 const EXPECTED_DESKTOP: GoldenRecord = {
-  bubbles: 44.0450828212779,
-  bubblesPrev: 44.05797505035298,
-  atoms: 530.7359690070152,
-  atomsColor: 354.29627442359924,
-  droplets: 19.451990395784378,
-  atomCount: 134,
+  bubbles: 82.64781701518586,
+  bubblesPrev: 82.65873884414759,
+  atoms: 836.3408926408738,
+  atomsColor: 546.8437252640724,
+  droplets: 28.703170500695705,
+  atomCount: 202,
   dropletCount: 5,
-  splashSum: 1,
-  rippleSum: 75,
-  h: 68,
-  o: 46,
-  h2: 20,
+  splashSum: 2,
+  rippleSum: 152,
+  h: 99,
+  o: 71,
+  h2: 32,
   dropletsLive: 5,
-  splashesTotal: 1,
-  absorbedTotal: 59,
-  dissolvedTotal: 16,
-  meanFill01: 0.28142252657302863,
+  splashesTotal: 2,
+  absorbedTotal: 110,
+  dissolvedTotal: 42,
+  meanFill01: 0.3122864617617281,
 };
 
 const EXPECTED_MOBILE: GoldenRecord = {
-  bubbles: 32.41104930639267,
-  bubblesPrev: 32.42189060058445,
-  atoms: 391.30120587721467,
-  atomsColor: 265.39019614458084,
-  droplets: 10.487372532486916,
-  atomCount: 101,
-  dropletCount: 5,
+  bubbles: 47.97128150227945,
+  bubblesPrev: 47.84718905808404,
+  atoms: 531.0043353140354,
+  atomsColor: 356.214117616415,
+  droplets: 21.089731879532337,
+  atomCount: 133,
+  dropletCount: 4,
   splashSum: 1,
-  rippleSum: 62,
-  h: 52,
-  o: 35,
-  h2: 14,
-  dropletsLive: 5,
+  rippleSum: 100,
+  h: 67,
+  o: 45,
+  h2: 21,
+  dropletsLive: 4,
   splashesTotal: 1,
-  absorbedTotal: 51,
-  dissolvedTotal: 11,
-  meanFill01: 0.2633138886251752,
+  absorbedTotal: 84,
+  dissolvedTotal: 16,
+  meanFill01: 0.3129974623659507,
 };
 
 const assertGolden = (actual: GoldenRecord, expected: GoldenRecord): void => {
@@ -133,24 +137,24 @@ const assertGolden = (actual: GoldenRecord, expected: GoldenRecord): void => {
 };
 
 describe('MizuNiNaruSim ゴールデン(seed=7・1800 step)', () => {
-  it('desktop(7 球)が記録値と一致する', () => {
-    assertGolden(runGolden(7), EXPECTED_DESKTOP);
+  it('desktop(12 球)が記録値と一致する', () => {
+    assertGolden(runGolden(12), EXPECTED_DESKTOP);
   });
 
-  it('mobile(5 球)が記録値と一致する', () => {
-    assertGolden(runGolden(5), EXPECTED_MOBILE);
+  it('mobile(7 球)が記録値と一致する', () => {
+    assertGolden(runGolden(7), EXPECTED_MOBILE);
   });
 
   it('2 回実行が同一(同一プロセス内の再現性 — init が完全リセットする)', () => {
-    const a = runGolden(7);
-    const b = runGolden(7);
+    const a = runGolden(12);
+    const b = runGolden(12);
     expect(a).toEqual(b);
   });
 
   it('同一インスタンスの re-init でも同一(状態のリーク無し)', () => {
     const sim = new MizuNiNaruSim();
     const runOnce = (): number => {
-      sim.init({ seed: 42, slotCount: 7 });
+      sim.init({ seed: 42, slotCount: 12 });
       for (let s = 0; s < 600; s++) sim.step();
       const v = sim.view();
       return (
@@ -163,17 +167,17 @@ describe('MizuNiNaruSim ゴールデン(seed=7・1800 step)', () => {
 
   it('異 seed は異なる世界を生む(seed が実際に効いている)', () => {
     const sim1 = new MizuNiNaruSim();
-    sim1.init({ seed: 1, slotCount: 7 });
+    sim1.init({ seed: 1, slotCount: 12 });
     const sim2 = new MizuNiNaruSim();
-    sim2.init({ seed: 2, slotCount: 7 });
+    sim2.init({ seed: 2, slotCount: 12 });
     for (let s = 0; s < 60; s++) {
       sim1.step();
       sim2.step();
     }
     const v1 = sim1.view();
     const v2 = sim2.view();
-    expect(checksum(v1.bubbles.data, 7, 8)).not.toBe(
-      checksum(v2.bubbles.data, 7, 8),
+    expect(checksum(v1.bubbles.data, 12, 8)).not.toBe(
+      checksum(v2.bubbles.data, 12, 8),
     );
   });
 });

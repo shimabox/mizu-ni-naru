@@ -1,6 +1,13 @@
+import { BUBBLE_CAPACITY } from '../../contract/WorldSpec';
 import { GERSTNER_CHUNK_GLSL, GERSTNER_UNIFORMS_GLSL } from './gerstner';
 import { IRID_CHUNK_GLSL, MIZU_BLUE_GLSL } from './glass';
 import { SKY_CHUNK_GLSL, SKY_UNIFORMS_GLSL } from './sky';
+
+/**
+ * 解析反射に参加する球の上限(A30)。容量は 16 だが描画コスト維持のため
+ * CPU がカメラに近い 8 球を毎フレーム選抜して詰める(OceanSystem.packBubbles)。
+ */
+export const MAX_REFLECT_BUBBLES = 8;
 
 /**
  * Ocean v2 の頂点/フラグメント(design-render §2.1 / §2.2 / §2.3 / §2.6)。
@@ -11,7 +18,7 @@ import { SKY_CHUNK_GLSL, SKY_UNIFORMS_GLSL } from './sky';
  *   (リングの読み取りやすさ — §2.2)
  * - (c) フレネル / Beer-Lambert / 擬似 SSS / タイトスペキュラ + glitter / フォグ
  * - (d) フォーム 2 系統(ヤコビアン波頭 + B チャネル着水リング)+ Mizu の刻印
- * - (e) ANALYTIC_REFLECTIONS: ≤7 球の解析的球面反射(reflectEnv)
+ * - (e) ANALYTIC_REFLECTIONS: カメラ近傍 ≤8 球の解析的球面反射(reflectEnv — A30)
  * HDR 上限規約: glitter ≤ 3.5 / スペキュラ ≤ 4.0 / SSS ≤ 1.6
  * (bloom threshold 1.15 を上回るのはスペキュラ系のみ — §2.3)。
  */
@@ -79,9 +86,10 @@ uniform vec3 uSssColor;    // #2fc0a8 ターコイズ
 uniform vec3 uFoamColor;   // #eef7f5
 
 #ifdef ANALYTIC_REFLECTIONS
-uniform vec4 uBubblePosR[8];  // [cx, cy, cz, R_visual](補間 + 状態変形済み)
-uniform vec4 uBubbleMisc[8];  // [waterLevelYLocal/R, fill01, seed, fade]
-uniform int uBubbleCount;
+// 配列は BUBBLE_CAPACITY(16)だが、詰められるのはカメラ近傍 ≤8 球(A30)
+uniform vec4 uBubblePosR[${BUBBLE_CAPACITY}];  // [cx, cy, cz, R_visual](補間 + 状態変形済み)
+uniform vec4 uBubbleMisc[${BUBBLE_CAPACITY}];  // [waterLevelYLocal/R, fill01, seed, fade]
+uniform int uBubbleCount;                      // ≤ MAX_REFLECT_BUBBLES(8)
 #endif
 
 varying vec3 vWorldPos;
@@ -93,8 +101,8 @@ ${MIZU_BLUE_GLSL}
 ${IRID_CHUNK_GLSL}
 
 #ifdef ANALYTIC_REFLECTIONS
-// ≤7 球の閉形式レイ交差(§2.5)— 海面が揺れているため反射像は自然に歪む。
-// リム + 虹彩 + 内水の青の 3 要素で「球が映っている」と読めれば十分。
+// カメラ近傍 ≤8 球の閉形式レイ交差(§2.5 / A30)— 海面が揺れているため反射像は
+// 自然に歪む。リム + 虹彩 + 内水の青の 3 要素で「球が映っている」と読めれば十分。
 // 動的 index を避けるためヒット時に値をコピーする(ESSL への安全策)。
 vec3 reflectEnv(vec3 ro, vec3 rd) {
   vec3 env = sky(rd);
@@ -102,7 +110,7 @@ vec3 reflectEnv(vec3 ro, vec3 rd) {
   vec3 hitCenter = vec3(0.0);
   float hitR = 1.0;
   vec4 hitMisc = vec4(0.0);
-  for (int i = 0; i < 8; i++) {
+  for (int i = 0; i < ${MAX_REFLECT_BUBBLES}; i++) {
     if (i >= uBubbleCount) break;
     vec3 oc = ro - uBubblePosR[i].xyz;
     float b = dot(oc, rd);

@@ -125,7 +125,7 @@ export class SceneRenderer implements SkyRenderer {
       timeSec: stepF / STEP_HZ,
     };
     this.cameraRig.update(frame.timeSec);
-    // 7 球の CPU 距離ソート + 共有インスタンス属性の一括アップロード(§1.3)
+    // 12 球の CPU 距離ソート + 共有インスタンス属性の一括アップロード(§1.3)
     this.bubbleBuffers.sync(view, this.cameraRig.camera);
     // AtomView のゼロコピー属性(LabelSystem = 文字が原子の本体)
     this.atomAttributes.sync(view);

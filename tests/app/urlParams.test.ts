@@ -39,9 +39,9 @@ describe('parseUrlParams', () => {
     expect(p.slots).toBeUndefined();
   });
 
-  it('slots は 1..BUBBLE_CAPACITY(8)に制限する', () => {
-    expect(parseUrlParams('?slots=8').slots).toBe(8);
-    expect(parseUrlParams('?slots=9').slots).toBeUndefined();
+  it('slots は 1..BUBBLE_CAPACITY(16)に制限する', () => {
+    expect(parseUrlParams('?slots=16').slots).toBe(16);
+    expect(parseUrlParams('?slots=17').slots).toBeUndefined();
     expect(parseUrlParams('?slots=1').slots).toBe(1);
   });
 });

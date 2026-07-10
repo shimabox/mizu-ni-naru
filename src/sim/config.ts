@@ -4,38 +4,56 @@
  * 「根拠コメント付き定数集約」)。contract 側と重複する定数(STEP_HZ / DT /
  * SLOT_COUNT / 容量)は contract/WorldSpec.ts が正であり、ここには置かない。
  *
- * ペーシングの逆算チェーン(design-sim §5.7):
- *   リズム目標(15〜25s/落下, 7球) → 周期 ≈134s → T_fill ≈122s
+ * ペーシングの逆算チェーン(design-sim §5.7、A30 で 12/7 球に増量):
+ *   リズム目標(A30 改訂: 11〜20s/落下, 12球) → T_fill ≈132s ÷ 12 ≈ 11s/落下
  *   T_fill と「ぽつぽつ」感(2s強/粒) → N_DROPS_TARGET ≈55 → VOLUME_GAIN = 15
  *   雫レート 0.45/s → スポナー 1.5 体/s(40 step 間隔)
  *   溶解は供給の 1 割弱に抑える → P_DISSOLVE = 0.05
  * 校正ノブの優先順位(§7.5): ① SPAWN_INTERVAL_STEPS ② VOLUME_GAIN ③ P_DISSOLVE
  *
- * 校正実測(2026-07-11、scripts/calibrate.mts — seed 7/42/123/2026 × 900 s):
- *   desktop(7 球): T_fill mean 132.8 s(帯 90–150 ✓)/ 落下間隔 mean 20.5 s
- *                   (帯 15–25 ✓)/ 体積シェア 雫 85.3% : 溶解 14.7%(設計 85:15)
- *   mobile (5 球): T_fill mean 112.5 s ✓ / 落下間隔 mean 24.3 s(帯上限際 —
- *                   §5.6 の予測 ≈24.2 s どおり、A23 帯内)/ シェア 86.4 : 13.6
- *   → 全帯 PASS。ノブ変更なし(§5 の運動論見積 T_fill ≈122 s に対し実測 +9%)
+ * 校正実測(2026-07-11 A30 後、scripts/calibrate.mts — seed 7/42/123/2026 × 900 s):
+ *   desktop(12 球): T_fill mean 132.5 s(帯 90–150 ✓)/ 落下間隔 mean 11.8 s
+ *                    (A30 帯 11–20 ✓)/ 体積シェア 雫 85.3% : 溶解 14.7%(設計 85:15)
+ *   mobile (7 球): T_fill mean 113.2 s ✓ / 落下間隔 mean 17.4 s(帯 15–25 ✓)
+ *                    / シェア 86.1 : 13.9
+ *   → 全帯 PASS。ノブ変更なし(T_fill は球数に不変 — 落下間隔は球数比で短縮)
  */
 
-/* ── スロット / アンカー(§2.3)─────────────────────────────── */
+/* ── スロット / アンカー(§2.3、A30 で緩い二重リングに改訂)─────── */
 
-/** リング半径。隣接間隔 2·4.5·sin(π/7) ≈ 3.91 u > 2·R_MAX = 3.4 u(重なり回避の下限を満たす最小リング)。 */
-export const RING_RADIUS = 4.5;
-/** アンカー高さ帯。下限は落下演出の行程(≥1.4 u)確保、上限はカメラフレーミング協定。 */
-export const RING_Y_MIN = 2.8;
-export const RING_Y_MAX = 5.2;
-/** 角/半径ジッター(±)。最悪接近 ≈2.87 u でも分離チェック 8 回で解ける疎さ。 */
+/**
+ * 二重リング半径(A30: 内 r≈3.6 × 5 球 + 外 r≈6.3 × 7 球が目安)。
+ * 実値 3.5/6.5 は分離チェックの実現可能性から確定: 5 分割と 7 分割の格子は
+ * 最悪 π/35 ≈ 5.1° まで近接し、水平距離 ≈3.13 u。y 帯(幅 3.4)のロールで
+ * 最悪ペア(R_a+R_b+0.1 = 3.5 u)でも |Δy| ≥ √(3.5²−3.13²) ≈ 1.6 の解が常に
+ * 存在する(gap 2.9 u より狭いと大球ペアが幾何的に分離不能になる)。
+ * 同一リング内の隣接間隔は内 2·3.5·sin(π/5) ≈ 4.11 / 外 2·6.5·sin(π/7) ≈ 5.64 > 3.5 u。
+ */
+export const RING_INNER_RADIUS = 3.5;
+export const RING_OUTER_RADIUS = 6.5;
+/** 内リングのスロット比(A30: desktop 12 → 5+7、mobile 7 → 3+4)。 */
+export const INNER_RING_SHARE = 5 / 12;
+/** アンカー高さ帯(A30 で 2.6〜6.0 に拡大 — 奥行きと分離自由度)。上限はカメラフレーミング協定。 */
+export const RING_Y_MIN = 2.6;
+export const RING_Y_MAX = 6.0;
+/** 角/半径ジッター(±)。リング間 5.1° 近接ペアでも y 再ロールで解ける疎さ。 */
 export const ANGLE_JITTER = 0.06; // rad
 export const RADIAL_JITTER = 0.25; // u
 /** スポーン時の決定的分離チェック: 中心距離 ≥ R_a + R_b + margin まで再ロール(§2.3)。 */
 export const SEPARATION_MARGIN = 0.1; // u
-export const SEPARATION_MAX_TRIES = 8;
+/** 再ロール上限。二重リングの近接ペア(y 窓 ≈0.6/3.4 ≈ 18%)でも 16 回全滅は ≈4%(フォールバック付き)。 */
+export const SEPARATION_MAX_TRIES = 16;
+/**
+ * フォールバック(全試行失敗時)の y: 内リングは帯下端寄り・外リングは帯上端寄りに
+ * 離す(Δy 2.8 u)— フォールバック同士でも近接角ペア(水平 ≈3.0 u)が
+ * 3D 距離 √(3.0²+2.8²) ≈ 4.1 > 3.5 u で必ず分離する決定的最終手段。
+ */
+export const FALLBACK_Y_INNER = RING_Y_MIN + 0.3; // 2.9
+export const FALLBACK_Y_OUTER = RING_Y_MAX - 0.3; // 5.7
 /** bob(漂い)。振幅は R の 1 割未満(酔わない)、周期は満水時間の 1/13(単調さ回避)— 「呼吸」。 */
 export const BOB_AMP = 0.12; // u
 export const BOB_PERIOD_S = 9;
-/** 満水時に球が沈む「重み」演出。リング下限 2.8 − 0.35 > R_MAX + 落下判定余裕。 */
+/** 満水時に球が沈む「重み」演出。リング下限 2.6 − 0.35 = 2.25 > R_MAX 1.7 + 落下判定余裕。 */
 export const SAG_MAX = 0.35; // u
 
 /* ── 球体 / FSM(§2)──────────────────────────────────────── */
@@ -85,7 +103,8 @@ export const H_TARGET = 12;
 export const O_TARGET = 8;
 /**
  * 凝結スポナーの試行間隔(§5.3/§5.6): 1.5 体/s = 雫 0.5/s の律速上限。
- * mobile は 0.75 倍間隔(2.0 体/s)で周期 ≈121 s → 落下間隔 ≈24 s に補正。
+ * mobile は 0.75 倍間隔(2.0 体/s)で周期 ≈121 s → 7 球で落下間隔 ≈17 s
+ * (A30 帯 15–25 の中央寄り)に補正。
  */
 export const SPAWN_INTERVAL_STEPS_DESKTOP = 40;
 export const SPAWN_INTERVAL_STEPS_MOBILE = 30;

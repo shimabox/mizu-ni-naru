@@ -22,6 +22,7 @@ import type { FrameInfo, RenderSystem } from '../RenderSystem';
 import {
   INNER_CAP_FRAGMENT_GLSL,
   INNER_CAP_VERTEX_GLSL,
+  RIPPLES_PER_BUBBLE,
 } from '../shaders/innerCap';
 import {
   INNER_WATER_FRAGMENT_GLSL,
@@ -29,8 +30,6 @@ import {
 } from '../shaders/innerWater';
 import type { BubbleInstanceBuffers } from './BubbleInstanceBuffers';
 
-/** 球ごとの InnerRipple リングバッファ本数(§4b)。 */
-const RIPPLES_PER_BUBBLE = 6;
 /** 「発火していない」を示す誕生 stepF(age が巨大 → 減衰で消滅)。 */
 const RIPPLE_DEAD_BIRTH = -1e6;
 
@@ -86,8 +85,8 @@ const createCapDiskGeometry = (): BufferGeometry => {
  *
  * per-instance 属性は BubbleGlassSystem と同一の BubbleInstanceBuffers を共有。
  * InnerRippleView のイベントはレンダー側リングバッファ(球ごと 6 本、
- * 古い順上書き)に保持し、uniform `uInnerRipples[48]` で解析リング波として
- * キャップの法線に注入する(A7/A8)。
+ * 古い順上書き)に保持し、uniform `uInnerRipples[96]`(16 球 × 6 本)で
+ * 解析リング波としてキャップの法線に注入する(A7/A8)。
  */
 export class InnerWaterSystem implements RenderSystem {
   public readonly object: Group;
