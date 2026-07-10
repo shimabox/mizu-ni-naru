@@ -11,9 +11,9 @@
  */
 
 /** 速度チャネルへの押し下げゲイン(高さクランプ ±0.28u が上限を守る)。 */
-export const RIPPLE_SPLAT_GAIN = 0.22;
+export const RIPPLE_SPLAT_GAIN = 0.26;
 /** フォームリング注入ゲイン(フォームクランプ 1.5)。 */
-export const RIPPLE_FOAM_GAIN = 0.9;
+export const RIPPLE_FOAM_GAIN = 0.8;
 /** Mizu tint 注入ゲイン。 */
 export const RIPPLE_TINT_GAIN = 0.85;
 

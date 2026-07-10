@@ -172,7 +172,7 @@ void main() {
   float crestFoam = smoothstep(0.30, 0.65, 1.0 - jac);
   float foamRaw = clamp(foamE * 1.05 + crestFoam * 0.5, 0.0, 1.0);
   float breakup = texture2D(uNoise, vWorldPos.xz * 1.7 + vec2(uTimeSec * 0.01)).g;
-  float foam = foamRaw * smoothstep(0.25, 0.78, breakup + foamRaw * 0.5);
+  float foam = foamRaw * smoothstep(0.25, 0.82, breakup + foamRaw * 0.45);
 
   // 3) フレネル(Schlick、水の F0 = 0.02。フォームは粗面 → 反射抑制)
   float fresnel = (0.02 + 0.98 * pow(1.0 - facing, 5.0)) * (1.0 - 0.85 * foam);
