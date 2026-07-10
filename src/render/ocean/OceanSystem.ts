@@ -1,7 +1,9 @@
 import { Color, type DataTexture, Mesh, ShaderMaterial, Vector4 } from 'three';
 import type { SkyRenderView } from '../../contract/RenderView';
+import { BUBBLE_CAPACITY, BUBBLE_STATE } from '../../contract/WorldSpec';
 import type { SunUniforms } from '../Environment';
 import type { FrameInfo, QualityTier, RenderSystem } from '../RenderSystem';
+import { bubbleVisualSeed } from '../bubbles/BubbleInstanceBuffers';
 import {
   GERSTNER_WAVES,
   GERSTNER_WAVE_COUNT,
@@ -11,8 +13,11 @@ import {
 } from '../shaders/gerstner';
 import { OCEAN_FRAGMENT_GLSL, OCEAN_VERTEX_GLSL } from '../shaders/ocean';
 import { OceanGeometryCache } from './OceanGeometry';
+import type { RippleUniforms } from './RippleField';
 
 const TWO_PI = 2 * Math.PI;
+
+const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
 
 /** ティア → グリッド密度(design-render §9.3)。Phase 2 は tier0 固定起動。 */
 const GRID_BY_TIER: readonly (readonly [number, number])[] = [
@@ -37,8 +42,14 @@ export class OceanSystem implements RenderSystem {
   private readonly geometryCache = new OceanGeometryCache();
   private readonly waveB: Vector4[];
   private readonly phaseRates: number[];
+  private readonly bubblePosR: Vector4[];
+  private readonly bubbleMisc: Vector4[];
 
-  constructor(sun: SunUniforms, noiseTexture: DataTexture) {
+  constructor(
+    sun: SunUniforms,
+    noiseTexture: DataTexture,
+    ripple: RippleUniforms,
+  ) {
     const waveA: Vector4[] = [];
     this.waveB = [];
     this.phaseRates = [];
@@ -48,6 +59,13 @@ export class OceanSystem implements RenderSystem {
       waveA.push(new Vector4(Math.cos(rad), Math.sin(rad), w, wave.amp));
       this.waveB.push(new Vector4(wave.q, 0, 0, 0));
       this.phaseRates.push(gerstnerPhaseRate(wave.lambda));
+    }
+
+    this.bubblePosR = [];
+    this.bubbleMisc = [];
+    for (let i = 0; i < BUBBLE_CAPACITY; i++) {
+      this.bubblePosR.push(new Vector4(0, 0, 0, 0));
+      this.bubbleMisc.push(new Vector4(0, 0, 0, 0));
     }
 
     this.material = new ShaderMaterial({
@@ -66,10 +84,20 @@ export class OceanSystem implements RenderSystem {
         uMidColor: { value: new Color(0x0d4d6e) },
         uSssColor: { value: new Color(0x2fc0a8) },
         uFoamColor: { value: new Color(0xeef7f5) },
+        // リップルフィールド(RippleField と uniform 値オブジェクトを共有 —
+        // prerender のピンポン swap がテクスチャ参照を差し替える)
+        uRipple: ripple.uRipple,
+        uRippleTexelUv: ripple.uRippleTexelUv,
+        uRippleTexelWorld: ripple.uRippleTexelWorld,
+        uRippleHalfExtent: ripple.uRippleHalfExtent,
+        // 解析的球面反射(§2.5)— 補間 + 状態変形済みの球データを毎フレーム供給
+        uBubblePosR: { value: this.bubblePosR },
+        uBubbleMisc: { value: this.bubbleMisc },
+        uBubbleCount: { value: 0 },
       },
-      // Phase 3: ANALYTIC_REFLECTIONS / RIPPLE_FIELD の 2 変種を事前コンパイルし
-      // 参照切替(needsUpdate 再コンパイルのヒッチ回避 — §9.3)
-      defines: {},
+      // ANALYTIC_REFLECTIONS のティア変種(off)は Phase 4 で事前コンパイル
+      // し参照切替(needsUpdate 再コンパイルのヒッチ回避 — §9.3)
+      defines: { RIPPLE_FIELD: '', ANALYTIC_REFLECTIONS: '' },
     });
 
     const [rings, segments] = GRID_BY_TIER[0];
@@ -82,7 +110,7 @@ export class OceanSystem implements RenderSystem {
     this.object.matrixAutoUpdate = false;
   }
 
-  public update(_view: SkyRenderView, frame: FrameInfo): void {
+  public update(view: SkyRenderView, frame: FrameInfo): void {
     const t = frame.timeSec;
     const uniforms = this.material.uniforms;
     uniforms.uTimeSec.value = t;
@@ -92,6 +120,49 @@ export class OceanSystem implements RenderSystem {
     for (let i = 0; i < GERSTNER_WAVE_COUNT; i++) {
       this.waveB[i].y = (this.phaseRates[i] * t) % TWO_PI;
     }
+    uniforms.uBubbleCount.value = this.packBubbles(view, frame.alpha);
+  }
+
+  /**
+   * 解析反射の球 uniform(§2.5)。prev/curr 補間 + 状態変形(Spawning の
+   * スケールイン / Splashing の膨張・フェード)を CPU で適用し、
+   * 見た目半径 R_visual と fade を渡す。Dead は除外。
+   */
+  private packBubbles(view: SkyRenderView, alpha: number): number {
+    const bubbles = view.bubbles;
+    const count = Math.min(bubbles.count, BUBBLE_CAPACITY);
+    let n = 0;
+    for (let slot = 0; slot < count; slot++) {
+      const o = slot * 8;
+      const statePacked = bubbles.data[o + 7]; // curr のみ(prev lerp 禁止)
+      const state = Math.floor(statePacked);
+      if (state === BUBBLE_STATE.Dead) continue;
+      const prog = statePacked - state;
+      const grow =
+        state === BUBBLE_STATE.Spawning
+          ? 0.6 + 0.5 * prog - 0.1 * Math.sin(prog * 9)
+          : 1;
+      const pop = state === BUBBLE_STATE.Splashing ? 1 + 0.25 * prog : 1;
+      const fade = state === BUBBLE_STATE.Splashing ? 1 - prog : 1;
+      const r = lerp(bubbles.prevData[o + 3], bubbles.data[o + 3], alpha);
+      const rVisual = r * grow * pop;
+      if (rVisual <= 1e-4 || fade <= 1e-3) continue;
+      this.bubblePosR[n].set(
+        lerp(bubbles.prevData[o], bubbles.data[o], alpha),
+        lerp(bubbles.prevData[o + 1], bubbles.data[o + 1], alpha),
+        lerp(bubbles.prevData[o + 2], bubbles.data[o + 2], alpha),
+        rVisual,
+      );
+      this.bubbleMisc[n].set(
+        lerp(bubbles.prevData[o + 4], bubbles.data[o + 4], alpha) /
+          Math.max(r, 1e-5),
+        bubbles.data[o + 5], // fill01
+        bubbleVisualSeed(slot, bubbles.data[o + 3]),
+        fade,
+      );
+      n++;
+    }
+    return n;
   }
 
   public applyTier(tier: QualityTier): void {
