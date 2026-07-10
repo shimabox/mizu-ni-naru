@@ -12,6 +12,10 @@ import { Environment } from './Environment';
 import { createNoiseTexture } from './NoiseTexture';
 import { PostPipeline } from './PostPipeline';
 import type { FrameInfo, RenderSystem } from './RenderSystem';
+import { AtomSystem } from './atoms/AtomSystem';
+import { AtomViewAttributes } from './atoms/AtomViewAttributes';
+import { DropletSystem } from './atoms/DropletSystem';
+import { LabelSystem } from './atoms/LabelSystem';
 import { BubbleGlassSystem } from './bubbles/BubbleGlassSystem';
 import { BubbleInstanceBuffers } from './bubbles/BubbleInstanceBuffers';
 import { InnerWaterSystem } from './bubbles/InnerWaterSystem';
@@ -43,6 +47,7 @@ export class SceneRenderer implements SkyRenderer {
   private readonly noiseTexture: DataTexture;
   private readonly post: PostPipeline;
   private readonly bubbleBuffers: BubbleInstanceBuffers;
+  private readonly atomAttributes: AtomViewAttributes;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -68,6 +73,10 @@ export class SceneRenderer implements SkyRenderer {
     const environment = new Environment();
     this.addSystem(environment);
     this.addSystem(new OceanSystem(environment.sunUniforms, this.noiseTexture));
+    this.atomAttributes = new AtomViewAttributes();
+    this.addSystem(new AtomSystem(this.atomAttributes));
+    this.addSystem(new DropletSystem(environment.sunUniforms));
+    this.addSystem(new LabelSystem(this.atomAttributes));
     this.bubbleBuffers = new BubbleInstanceBuffers();
     this.addSystem(
       new InnerWaterSystem(
@@ -100,6 +109,8 @@ export class SceneRenderer implements SkyRenderer {
     this.cameraRig.update(frame.timeSec);
     // 7 球の CPU 距離ソート + 共有インスタンス属性の一括アップロード(§1.3)
     this.bubbleBuffers.sync(view, this.cameraRig.camera);
+    // AtomView のゼロコピー属性(AtomSystem / LabelSystem 共有)
+    this.atomAttributes.sync(view);
     for (const system of this.systems) {
       system.update(view, frame);
     }
