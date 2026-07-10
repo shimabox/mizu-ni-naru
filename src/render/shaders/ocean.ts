@@ -1,4 +1,5 @@
 import { GERSTNER_CHUNK_GLSL, GERSTNER_UNIFORMS_GLSL } from './gerstner';
+import { MIZU_BLUE_GLSL } from './glass';
 import { SKY_CHUNK_GLSL, SKY_UNIFORMS_GLSL } from './sky';
 
 /**
@@ -84,6 +85,7 @@ varying float vWaveY;
 
 ${SKY_CHUNK_GLSL}
 ${GERSTNER_CHUNK_GLSL}
+${MIZU_BLUE_GLSL}
 
 void main() {
   // 1) 法線: 8 波解析導関数 + リップル勾配の線形加算(§2.1 / §2.2)
@@ -97,6 +99,7 @@ void main() {
 
   float rippleH = 0.0;
   float foamE = 0.0;
+  float mizuTint = 0.0;
   vec2 rippleGrad = vec2(0.0);
   #ifdef RIPPLE_FIELD
   float rMask = rippleMask(vWorldPos.xz);
@@ -110,6 +113,7 @@ void main() {
     rippleGrad = vec2(hr - hl, hu - hd) / (2.0 * uRippleTexelWorld) * rMask;
     rippleH = rc.r * rMask;
     foamE = rc.b * rMask;
+    mizuTint = rc.a * rMask;
   }
   #endif
   vec3 n = normalize(vec3(-(grad.x + rippleGrad.x),
@@ -119,8 +123,12 @@ void main() {
   float dist = distance(vWorldPos, cameraPosition);
   float facing = max(dot(-viewDir, n), 0.0);
 
-  // 2) フォーム量(Phase 3 §2.4 で foamMask(jac, foamE)に置換)
-  float foam = 0.0;
+  // 2) フォーム量(§2.4 — 2 系統: ヤコビアン波頭 + 着水フォームリング)
+  //    凪の海なので波頭フォームは稀 — スウェルが重なった瞬間だけ筋状に湧く
+  float crestFoam = smoothstep(0.30, 0.65, 1.0 - jac);
+  float foamRaw = clamp(foamE * 1.05 + crestFoam * 0.5, 0.0, 1.0);
+  float breakup = texture2D(uNoise, vWorldPos.xz * 1.7 + vec2(uTimeSec * 0.01)).g;
+  float foam = foamRaw * smoothstep(0.25, 0.78, breakup + foamRaw * 0.5);
 
   // 3) フレネル(Schlick、水の F0 = 0.02。フォームは粗面 → 反射抑制)
   float fresnel = (0.02 + 0.98 * pow(1.0 - facing, 5.0)) * (1.0 - 0.85 * foam);
@@ -143,6 +151,9 @@ void main() {
 
   vec3 color = mix(body, reflected, fresnel);
 
+  // Mizu の刻印: 生成直後のリング内側にだけ #007fff を 5% 混ぜる(§2.4)
+  color = mix(color, MIZU_BLUE, 0.05 * clamp(mizuTint, 0.0, 1.0));
+
   // 7) 太陽スペキュラ(タイト)+ マイクロ glitter(ジッタ法線の超高指数ローブ)
   vec3 halfDir = normalize(uSunDir - viewDir);
   color += uSunColor * (4.0 * pow(max(dot(n, halfDir), 0.0), 600.0));
@@ -152,8 +163,9 @@ void main() {
   float glint = pow(max(dot(gn, halfDir), 0.0), 1400.0);
   color += uSunColor * min(glint * 3.5, 3.5) * exp(-dist * 0.02);
 
-  // 8) TODO(Phase 3 §2.4): フォーム合成 — color = mix(color, foamLit, foam)
-  color = mix(color, uFoamColor, foam);
+  // 8) フォーム合成(§2.4)— 反射より後、フォグより前。太陽高度でライト
+  vec3 foamLit = uFoamColor * mix(0.55, 1.0, max(uSunDir.y, 0.0) * 0.8 + 0.2);
+  color = mix(color, foamLit, foam);
 
   // 9) 距離フォグ: sky(viewDir) へ溶かす(背景と数学的に一致 — 継ぎ目ゼロ)
   float fog = 1.0 - exp(-pow(dist / 260.0, 1.35));

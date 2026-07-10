@@ -54,10 +54,11 @@ void main() {
   float v = (f.g + (avg - f.r) * uK) * uVelDamp;
   float h = (f.r + v) * uHeightDamp;
 
-  // フォーム: 微拡散 + 減衰 + 強い波動の場所は自然に白く(§2.2)
+  // フォーム: 微拡散 + 減衰 + 強い波動の場所は自然に白く(§2.2)。
+  // 拡散 0.12(リングが 3s 保つ)/ 運動由来はごく僅か(リングの繊細さ優先)
   float foamAvg = 0.25 * (fl.b + fr.b + fd.b + fu.b);
-  float foam = mix(f.b, foamAvg, 0.35) * uFoamDecay;
-  foam += clamp(abs(v) * 0.5 - 0.0015, 0.0, 0.012);
+  float foam = mix(f.b, foamAvg, 0.12) * uFoamDecay;
+  foam += clamp(abs(v) * 0.28 - 0.002, 0.0, 0.006);
 
   // Mizu tint(刻印): 拡散なし・減衰のみ
   float tint = f.a * uTintDecay;
