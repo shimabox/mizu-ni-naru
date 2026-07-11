@@ -19,14 +19,20 @@ const vec3 MIZU_BLUE = vec3(0.0, 0.2122, 1.0);
 
 /**
  * A44: 球ごとの水色ハッシュ — per-generation seed(aMisc.y、A22 方式:
- * slot+R から導出)からもう一段独立ハッシュして tint 係数 t∈[0,1] を得る。
- * t=0 が現在色(最濃端)、t=1 が薄く透明な水色。体積(innerWater)・
+ * slot+R から導出)からもう一段独立ハッシュして tint 係数 t を得る。
+ * t=0 が現在色(最濃端)、大きいほど薄く透明な水色。体積(innerWater)・
  * キャップ(innerCap)・メニスカス(本ファイル)が同じ関数で追従し
  * 「その球の水」として一貫させる。
+ *
+ * A47(A44 追補): 「薄すぎても微妙 — 薄さの下限はもっと上げていい」。
+ * 生ハッシュ [0,1] を WATER_TINT_MAX = 0.55 で圧縮(変化幅を約半分に)。
+ * 最薄の球でもはっきり「青い水」に見える。雫(A46)も同じ関数を共有する
+ * ため同様に圧縮 — 白っぽさへの回帰(A31 の再発)を防ぐ方向で一貫。
  */
 export const WATER_TINT_GLSL = /* glsl */ `
+const float WATER_TINT_MAX = 0.55;  // A47: 薄い側の到達点(1.0 → 0.55 に圧縮)
 float waterTint(float seed) {
-  return fract(sin(seed * 91.345 + 7.13) * 43758.5453);
+  return WATER_TINT_MAX * fract(sin(seed * 91.345 + 7.13) * 43758.5453);
 }
 const vec3 MIZU_LIGHT = vec3(0.58, 0.84, 0.92);
 `;
