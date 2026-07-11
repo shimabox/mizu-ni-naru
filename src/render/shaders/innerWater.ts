@@ -22,6 +22,8 @@ export const RIPPLE_NEAR_COUNT = 12;
  * 閉形式で求めて吸収に使う(レイマーチ不要)。水面平面より上は discard。
  * αブレンド + depthWrite ON — 「原子・雫は常に球内水面より上」(A25)により
  * ソート不要で閉じる。水の見た目半径は WATER_VISUAL_RATIO = 0.985R(A13)。
+ * InnerRipple の波紋は視線と水面平面の交点(tPlane 交点)で評価する
+ * (A43 改訂 — 真下から見ても輪が消えない。詳細はフラグメント内コメント)。
  */
 export const WATER_VISUAL_RATIO = 0.985;
 
@@ -127,26 +129,41 @@ void main() {
   float alpha = clamp(0.42 + 0.38 * (1.0 - absorb.b), 0.0, 0.8) * mix(1.0, 0.75, tint);
   alpha *= smoothstep(0.0, 0.03, vFill); // 空球の極小レンズを消す
 
-  // A43: 下から見える波紋 — キャップと同じ解析リング波(伝播 0.9 u/s・
-  // 減衰 1.8/s、innerCap.ts と同一定数)を「水中を透過する光の明暗」として
-  // 評価する。エントリ点の球ローカル (x, z) で評価し、水面からの深さで
-  // exp 減衰(表層で強く、底で弱く)。ギラつかせないよう控えめな乗算のみ。
+  // A43(改訂): 波紋(キャップと同じ解析リング波 — 伝播 0.9 u/s・減衰 1.8/s、
+  // innerCap.ts と同一定数)を「水中を透過する光の明暗」として評価する。
+  // 初版は入射点(vWorldPos)の球ローカル (x, z) + 入射点の深度で減衰させて
+  // いたため、真下から見ると入射点が常に球の最深部になり、輪が実質ゼロに
+  // 減衰していた(ユーザー実機報告)。修正: 視線(rd)と水面平面
+  // (y = vWaterPlaneY)の交点(tPlane 交点)を求め、その交点の球ローカル
+  // (x, z) でリング場を評価する。上から見る場合は入射点がほぼ水面上にある
+  // ため交点 ≈ 入射点(従来と同等)。真下・斜めから見る場合は交点が実際の
+  // 波紋の乗る水面位置になるため輪が消えない — 「下から水面の模様を
+  // 見上げる」物理に一致。減衰は入射点→交点までの水中光路長(tPlane)に
+  // 対するごく弱い exp(vR 換算で最大 ~2 のとき残存 ≥40% 目安)。交点が
+  // 球の cap 半径外(視線が水面と交わらない/球外で交わる)場合はゼロに
+  // クランプ。ギラつかせないよう控えめな乗算のみ。
   if (vSlot >= 0.0) {
-    vec2 localXZ = vWorldPos.xz - vCenter.xz;
-    float ringGlow = 0.0;
-    int base = int(vSlot + 0.5) * 6;
-    for (int k = 0; k < 6; k++) {
-      vec4 rp = uInnerRipples[base + k];
-      vec2 d = localXZ - rp.xy;
-      float dist = length(d) + 1e-4;
-      float age = max((uStepF - rp.z) / 60.0, 0.0);
-      float radius = 0.9 * age;
-      float env = exp(-6.0 * abs(dist - radius)) * exp(-1.8 * age) * rp.w;
-      ringGlow += env * sin(40.0 * (dist - radius));
+    vec3 planeHit = vWorldPos + rd * tPlane;
+    vec2 planeXZ = planeHit.xz - vCenter.xz;
+    float capYOffset = vWaterPlaneY - vCenter.y;
+    float capR2 = max(vR * vR - capYOffset * capYOffset, 0.0);
+    bool hasPlaneHit = tPlane < tExit;
+    bool inCap = dot(planeXZ, planeXZ) <= capR2;
+    if (hasPlaneHit && inCap) {
+      float ringGlow = 0.0;
+      int base = int(vSlot + 0.5) * 6;
+      for (int k = 0; k < 6; k++) {
+        vec4 rp = uInnerRipples[base + k];
+        vec2 d = planeXZ - rp.xy;
+        float dist = length(d) + 1e-4;
+        float age = max((uStepF - rp.z) / 60.0, 0.0);
+        float radius = 0.9 * age;
+        float env = exp(-6.0 * abs(dist - radius)) * exp(-1.8 * age) * rp.w;
+        ringGlow += env * sin(40.0 * (dist - radius));
+      }
+      float pathAtten = exp(-0.45 * clamp(tPlane / max(vR, 1e-5), 0.0, 2.0));
+      color = max(color * (1.0 + ringGlow * pathAtten * 0.35), vec3(0.0));
     }
-    float depth = max(vWaterPlaneY - vWorldPos.y, 0.0);
-    float depthAtten = exp(-depth * 1.5);
-    color = max(color * (1.0 + ringGlow * depthAtten * 0.35), vec3(0.0));
   }
 
   gl_FragColor = vec4(color, alpha);
