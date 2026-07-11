@@ -46,6 +46,12 @@ vec2 rippleUv(vec2 xz) {
 #endif
 `;
 
+// A55: 世界そのものが球体である気配(a)— 放射グリッドの基準面(y=0)に極めて
+// 弱い惑星曲率(球面の局所近似 y ≈ -r²/2R)を先に適用し、Gerstner/リップルは
+// その上に乗せる。K は「r=600(最外周)で沈み ≈4u」水準 — 気づかれるかどうかの
+// ギリギリのラインに留める(§0 Look の「控えめさ」が要件そのもの)。
+const OCEAN_CURVATURE_K = 1.1e-5;
+
 export const OCEAN_VERTEX_GLSL = /* glsl */ `
 precision highp float;
 ${GERSTNER_UNIFORMS_GLSL}
@@ -60,9 +66,11 @@ void main() {
   #ifdef RIPPLE_FIELD
   gain *= swellZoneGain(xz);
   #endif
+  // A55: 惑星曲率 — 中心からの距離の 2 乗でわずかに沈める(基準面の変形)
+  float curveY = -${OCEAN_CURVATURE_K} * dot(xz, xz);
   // 頂点は波 0-4 のみ(chop 5-7 は頂点解像度未満 — フラグメント法線専任 §2.1)
   vec3 off = gerstnerOffset(xz, 0, 5, gain);
-  vec3 wp = vec3(xz.x + off.x, off.y, xz.y + off.z);
+  vec3 wp = vec3(xz.x + off.x, curveY + off.y, xz.y + off.z);
   #ifdef RIPPLE_FIELD
   // Gerstner 変位後のワールド xz で 1 タップ(横変位 ≤ 0.25u < 4 texel — §2.2)
   wp.y += texture2D(uRipple, rippleUv(wp.xz)).r * rippleMask(wp.xz);

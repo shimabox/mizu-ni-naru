@@ -37,6 +37,18 @@ vec3 sky(vec3 dir) {
 
   float s = max(dot(dir, uSunDir), 0.0);
   col += uSunColor * (0.30 * pow(s, 16.0) + 3.2 * pow(s, 900.0));
+
+  // A55: 世界そのものが球体である気配(b)— 水平線際(グレージング角)にだけ、
+  // 球体ガラスの薄膜干渉(IRID_CHUNK_GLSL の cos パレット)と同系の虹彩を
+  // ごく薄く重ねる。太陽方位とは独立(全周)。HDR には乗せない(ピーク寄与
+  // ≈0.02 — bloom 閾値 1.15 に遠く及ばない)。「言われれば分かる」程度に留める
+  float grazeBand = 1.0 - smoothstep(0.0, 0.16, abs(h));
+  if (grazeBand > 0.001) {
+    float az = atan(dir.z, dir.x);
+    float phase = az * 0.5 + h * 3.0;
+    vec3 worldIrid = 0.5 + 0.5 * cos(6.28318 * (phase + vec3(0.0, 0.33, 0.67)));
+    col += worldIrid * (grazeBand * grazeBand) * 0.022;
+  }
   return col;
 }
 `;
