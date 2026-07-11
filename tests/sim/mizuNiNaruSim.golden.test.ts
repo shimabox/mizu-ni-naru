@@ -132,13 +132,22 @@ const runGolden = (slotCount: number, steps = 1800): GoldenRecord => {
  * 分岐先変化 — 30 s のカオス的発散は A32/A40/A42 再記録時と同種の既知の
  * 現象)。校正実測(scripts/calibrate.mts)で T_fill・落下間隔が帯内に収まる
  * ことを確認済み(config.ts のコメント参照)。
+ * 2026-07-12 再記録(10): A56(球の高さ帯上限 RING_Y_MAX 6.0→9.0 拡大)で
+ * アンカー y のロール範囲そのものが変わったため(変更管理手順に基づく
+ * 再記録)。**RNG 呼び順・消費回数は完全に不変**(y のロールは同じ
+ * `RING_Y_MIN + rng.next()·(RING_Y_MAX−RING_Y_MIN)` 呼び出し 1 回のまま、
+ * 出力範囲が広がっただけ)— そのため bubbles/bubblesPrev/atoms/droplets の
+ * 位置チェックサムのみ変化し、atomCount/dropletCount/h/o/h2/splashesTotal/
+ * absorbedTotal/dissolvedTotal/meanFill01/atomsColor/rippleSum/splashSum は
+ * ビット単位で不変(個体群動態・化学は高さ帯と独立というスケール不変性の
+ * 裏付け)。
  */
 const EXPECTED_MAIN: GoldenRecord = {
-  bubbles: 72.5044176296824,
-  bubblesPrev: 72.35850631173525,
-  atoms: 588.3630127198994,
+  bubbles: 90.50441667600808,
+  bubblesPrev: 90.35850535806094,
+  atoms: 885.3630117662251,
   atomsColor: 480.45333328843117,
-  droplets: 25.289489276707172,
+  droplets: 40.28948927670717,
   atomCount: 177,
   dropletCount: 8,
   splashSum: 3,
@@ -158,11 +167,11 @@ const EXPECTED_MAIN: GoldenRecord = {
  * フィールド 84)そのものの回帰を短時間で検知する。再記録手順は上と同じ。
  */
 const EXPECTED_SMOKE_96: GoldenRecord = {
-  bubbles: 633.595410763286,
-  bubblesPrev: 633.6073924349621,
-  atoms: 7550.090923984535,
+  bubbles: 777.7412919392809,
+  bubblesPrev: 777.7532721804455,
+  atoms: 10201.48763914872,
   atomsColor: 4550.16019564867,
-  droplets: -1.9234420359134674,
+  droplets: 40.07655939459801,
   atomCount: 1764,
   dropletCount: 23,
   splashSum: 0,
