@@ -3,6 +3,7 @@ import {
   type SlotPlacement,
   SlotRing,
   emptyPlacement,
+  minMargin,
 } from '../../../src/sim/bubble/SlotRing';
 import {
   ANGLE_JITTER,
@@ -125,9 +126,10 @@ describe('SlotRing(§2.3 / A30 — 二重リング配置と決定的分離チェ
     expect(separatedCount).toBeGreaterThan(15);
   });
 
-  it('分離不能な others では決定的フォールバック(ジッターなし基準位置 + リング別 y)', () => {
+  it('分離不能な others ではベスト候補フォールバック(A42: 基準位置以上のスコアを保証)', () => {
     const ring = new SlotRing(12);
-    // 外リングのスロット 5 のジッター箱全域を覆う巨大な他者(半径 5)
+    // 外リングのスロット 5 のジッター箱全域を覆う巨大な他者(半径 5)—
+    // 基準位置・全ジッター候補とも分離不成立(スコア<0)のまま
     const theta = Math.PI / 7;
     const blocker: SlotPlacement = {
       r: 5,
@@ -139,9 +141,21 @@ describe('SlotRing(§2.3 / A30 — 二重リング配置と決定的分離チェ
     };
     const out = emptyPlacement();
     ring.rollInto(new Mulberry32(5), 5, [blocker], out);
-    expect(out.baseX).toBeCloseTo(RING_OUTER_RADIUS * Math.cos(theta), 10);
-    expect(out.baseZ).toBeCloseTo(RING_OUTER_RADIUS * Math.sin(theta), 10);
-    expect(out.baseY).toBeCloseTo(FALLBACK_Y_OUTER, 10);
+    // A42: ベスト候補フォールバックは「ジッターなし基準位置」のスコア以上を
+    // 保証する(基準位置そのものが選ばれるとは限らない)
+    const baseScore = minMargin(
+      RING_OUTER_RADIUS * Math.cos(theta),
+      FALLBACK_Y_OUTER,
+      RING_OUTER_RADIUS * Math.sin(theta),
+      out.r,
+      [blocker],
+    );
+    const outScore = minMargin(out.baseX, out.baseY, out.baseZ, out.r, [
+      blocker,
+    ]);
+    expect(outScore).toBeGreaterThanOrEqual(baseScore - 1e-9);
+    // 巨大 blocker が全域を覆うため、分離は依然として不成立のまま
+    expect(outScore).toBeLessThan(0);
   });
 
   it('同 seed からは同一配置(決定論)', () => {

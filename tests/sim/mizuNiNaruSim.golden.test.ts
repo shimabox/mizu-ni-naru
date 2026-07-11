@@ -109,25 +109,36 @@ const runGolden = (slotCount: number, steps = 1800): GoldenRecord => {
  * VOLUME_GAIN 21→22 に再スケール)で fill01 閾値・体積換算が再度
  * 変わったため(変更管理手順に基づく再記録。rollSlot の RNG 消費順は
  * 再記録(5)から不変 — 帯の分布幅が変わるのみ)。
+ * 2026-07-11 再記録(7): A42(球サイズをもっとバラバラに — R 帯
+ * [1.1,1.7]→[0.75,2.3]、u² シェーピング、身の丈ロール上限
+ * R_NEAR_RING_MAX=1.8/FIELD_INNER_MAX=1.3、SEPARATION_MAX_TRIES 16→32、
+ * 全滅時をベスト候補フォールバックに変更)で R そのもの・分離チェックの
+ * 試行数上限・フォールバック選択が意図して変わったため(変更管理手順に
+ * 基づく再記録。RNG 呼び順は不変 — 1 スロットあたりの消費回数は
+ * SEPARATION_MAX_TRIES 依存の可変長で従来通り、値のみ変わる)。
+ * 2026-07-11 再記録(8): A42 校正(§7.5 ノブ①)で
+ * SPAWN_INTERVAL_STEPS_DESKTOP 44→46 に再調整したため(config.ts 参照)。
+ * slotCount=12 の主系列は SLOT_COUNT_MOBILE(24)以下 = mobile 扱いで
+ * このノブの影響を受けず不変。96 球スモークのみ再記録。
  */
 const EXPECTED_MAIN: GoldenRecord = {
-  bubbles: 82.2627837555483,
-  bubblesPrev: 82.13593697489705,
-  atoms: 502.28646859526634,
-  atomsColor: 436.7654901444912,
-  droplets: 62.68598620593548,
-  atomCount: 163,
-  dropletCount: 7,
-  splashSum: 3,
-  rippleSum: 711,
-  h: 82,
-  o: 58,
-  h2: 23,
-  dropletsLive: 7,
-  splashesTotal: 3,
-  absorbedTotal: 156,
-  dissolvedTotal: 55,
-  meanFill01: 0.46172239608739307,
+  bubbles: 74.31109456199374,
+  bubblesPrev: 74.33333979614872,
+  atoms: 615.8828362887725,
+  atomsColor: 563.2696081101894,
+  droplets: 36.182194761931896,
+  atomCount: 211,
+  dropletCount: 4,
+  splashSum: 2,
+  rippleSum: 703,
+  h: 106,
+  o: 76,
+  h2: 29,
+  dropletsLive: 4,
+  splashesTotal: 2,
+  absorbedTotal: 144,
+  dissolvedTotal: 64,
+  meanFill01: 0.4668081433134574,
 };
 
 /**
@@ -135,23 +146,23 @@ const EXPECTED_MAIN: GoldenRecord = {
  * フィールド 84)そのものの回帰を短時間で検知する。再記録手順は上と同じ。
  */
 const EXPECTED_SMOKE_96: GoldenRecord = {
-  bubbles: 634.3571776030003,
-  bubblesPrev: 634.2248721272335,
-  atoms: 6956.4865187276155,
-  atomsColor: 4519.3766668736935,
-  droplets: 29.222887136042118,
-  atomCount: 1746,
-  dropletCount: 27,
+  bubbles: 635.2386147133075,
+  bubblesPrev: 635.1143576246686,
+  atoms: 7826.454512866214,
+  atomsColor: 4504.336470156908,
+  droplets: 78.16660223901272,
+  atomCount: 1749,
+  dropletCount: 21,
   splashSum: 0,
-  rippleSum: 552,
-  h: 915,
-  o: 682,
-  h2: 149,
-  dropletsLive: 27,
+  rippleSum: 541,
+  h: 918,
+  o: 689,
+  h2: 142,
+  dropletsLive: 21,
   splashesTotal: 0,
-  absorbedTotal: 46,
-  dissolvedTotal: 43,
-  meanFill01: 0.38582069847595374,
+  absorbedTotal: 49,
+  dissolvedTotal: 32,
+  meanFill01: 0.388220827917184,
 };
 
 const assertGolden = (actual: GoldenRecord, expected: GoldenRecord): void => {
