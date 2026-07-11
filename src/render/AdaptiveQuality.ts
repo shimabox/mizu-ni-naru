@@ -6,20 +6,33 @@ import type { QualityTier } from './RenderSystem';
  * spray 上限 の 2 ノブを追加)。
  *
  * 制御ロジックは rAF デルタ EMA(α=0.1)+ 非対称ヒステリシス:
- * - down: EMA > 15ms が 30 フレーム連続 → ティア+1(悪化)
+ * - down: EMA > 20ms が 90 フレーム連続 → ティア+1(悪化)
  * - up:   EMA < 11ms が 600 フレーム連続 → ティア-1(改善)
  * - 250ms 超のフレームデルタ(タブ復帰・GC 長時間停止等の外乱)は
  *   ストリークを破棄する(EMA 自体は更新しない — 一発で暴発させない)
+ *
+ * A50(2026-07-11 ユーザー指示「くっきりめのほうがよい」): 旧閾値(15ms/30f)は
+ * 60fps(16.7ms)環境でもバックグラウンド負荷等の一時的ノイズで容易に降格
+ * ストリークが成立し、戻り(600f)に時間がかかるため「一度ぼやけると居着く」
+ * 体感になっていた。60fps は無条件に down 対象から外れる余裕(20ms、
+ * 75Hz 環境の 13.3ms も安全域)を持たせ、ストリーク長も 90 フレーム(60fps で
+ * 約 1.5 秒)に伸ばして真に継続的な低フレームレートのみで降格するようにした。
+ * 降格機構自体(非力な端末向けの保護)は撤去しない — 閾値のみ緩和。
+ * up 側は変更なし(戻りは慎重なままでよい、というユーザーの意図を汲む)。
  *
  * この節は**純関数のみ**(node でテスト可能)。DOM/three への副作用は
  * AdaptiveQuality クラス(下部)と呼び出し元(app/main.ts)が持つ。
  */
 export const EMA_ALPHA = 0.1;
-export const DOWN_THRESHOLD_MS = 15;
-export const DOWN_STREAK_FRAMES = 30;
+export const DOWN_THRESHOLD_MS = 20;
+export const DOWN_STREAK_FRAMES = 90;
 export const UP_THRESHOLD_MS = 11;
 export const UP_STREAK_FRAMES = 600;
-/** これを超える rAF デルタは外乱として無視(ストリーク破棄・EMA 据え置き)。 */
+/**
+ * これを超える rAF デルタは外乱として無視(ストリーク破棄・EMA 据え置き)。
+ * DOWN_THRESHOLD_MS(20ms)より十分大きく(250ms ≫ 20ms)、外乱判定と
+ * down 判定のレンジは重ならない — A50 の閾値引き上げ後も矛盾なし。
+ */
 export const DISTURBANCE_MS = 250;
 
 export interface EmaState {

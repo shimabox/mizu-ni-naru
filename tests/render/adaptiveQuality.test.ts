@@ -25,9 +25,9 @@ describe('updateEma', () => {
   });
 
   it('EMA が閾値を上回っている間 downStreak が増加する', () => {
-    let state = createEmaState(20); // 既に閾値超
+    let state = createEmaState(25); // 既に閾値超
     for (let i = 1; i <= 5; i++) {
-      state = updateEma(state, 20);
+      state = updateEma(state, 25);
       expect(state.ema).toBeGreaterThan(DOWN_THRESHOLD_MS);
       expect(state.downStreak).toBe(i);
       expect(state.upStreak).toBe(0);
@@ -45,8 +45,8 @@ describe('updateEma', () => {
   });
 
   it('外乱(dtMs > 250ms)は EMA を更新せずストリークだけ破棄する', () => {
-    let state = createEmaState(20);
-    for (let i = 0; i < 5; i++) state = updateEma(state, 20);
+    let state = createEmaState(25);
+    for (let i = 0; i < 5; i++) state = updateEma(state, 25);
     expect(state.downStreak).toBe(5);
     const emaBefore = state.ema;
 
@@ -56,11 +56,18 @@ describe('updateEma', () => {
     expect(state.upStreak).toBe(0);
   });
 
-  it('中間帯(11ms〜15ms)ではどちらのストリークも増えない', () => {
+  it('中間帯(11ms〜20ms)ではどちらのストリークも増えない', () => {
     let state = createEmaState(13);
     state = updateEma(state, 13);
     expect(state.downStreak).toBe(0);
     expect(state.upStreak).toBe(0);
+  });
+
+  it('A50: 60fps 相当(16.7ms)は down 判定に入らない(EMA が閾値未満)', () => {
+    let state = createEmaState(16.67);
+    for (let i = 0; i < 10; i++) state = updateEma(state, 16.67);
+    expect(state.ema).toBeLessThan(DOWN_THRESHOLD_MS);
+    expect(state.downStreak).toBe(0);
   });
 });
 
@@ -109,14 +116,41 @@ describe('AdaptiveQuality クラス(統合的な状態機械テスト)', () => {
     expect(calls).toEqual([2]);
   });
 
-  it('持続的に重い(20ms)フレームが続くと 30 フレーム目でティアが1段悪化する', () => {
+  it('持続的に重い(21ms)フレームが続くとティアが1段悪化する(初期 EMA の収束分を見込んだ余裕フレーム数で検証)', () => {
     const calls: number[] = [];
     const aq = new AdaptiveQuality(0, (t) => calls.push(t));
-    for (let i = 0; i < 29; i++) aq.update(20);
+    // 初期 EMA(≈16.67ms)が 21ms へ収束し 20ms を上回るまで 14 フレームかかる
+    // (updateEma の指数追従)。そこから DOWN_STREAK_FRAMES(90)連続で降格する
+    // ため、境界は 14 - 1 + 90 = 103 フレーム目。
+    for (let i = 0; i < 102; i++) aq.update(21);
     expect(aq.currentTier).toBe(0);
-    aq.update(20);
+    aq.update(21);
     expect(aq.currentTier).toBe(1);
     expect(calls).toEqual([0, 1]);
+  });
+
+  it('A50: 16.7ms(60fps相当)が続いても 90 フレームでは降格しない(1000 フレーム連続でも安定)', () => {
+    const aq = new AdaptiveQuality(0, () => {});
+    for (let i = 0; i < 1000; i++) aq.update(16.67);
+    expect(aq.currentTier).toBe(0);
+  });
+
+  it('A50: 20ms 超(21ms)が十分に連続すると降格する(境界フレームで検証)', () => {
+    const aq = new AdaptiveQuality(0, () => {});
+    for (let i = 0; i < 102; i++) aq.update(21);
+    expect(aq.currentTier).toBe(0);
+    aq.update(21);
+    expect(aq.currentTier).toBe(1);
+  });
+
+  it('A50: 一時的なスパイク(数フレームだけ重い)では降格しない', () => {
+    const aq = new AdaptiveQuality(0, () => {});
+    // 21ms のスパイクを 10 フレームだけ挟み、すぐ 16.7ms に戻す — を何度も繰り返す
+    for (let round = 0; round < 20; round++) {
+      for (let i = 0; i < 10; i++) aq.update(21);
+      for (let i = 0; i < 5; i++) aq.update(16.67);
+    }
+    expect(aq.currentTier).toBe(0);
   });
 
   it('持続的に軽い(8ms)フレームが十分続くとティアが1段改善する(初期 EMA の収束分を見込んだ余裕フレーム数で検証)', () => {
@@ -133,17 +167,17 @@ describe('AdaptiveQuality クラス(統合的な状態機械テスト)', () => {
 
   it('外乱フレームはストリークをリセットし誤発火しない', () => {
     const aq = new AdaptiveQuality(0, () => {});
-    for (let i = 0; i < 29; i++) aq.update(20);
+    for (let i = 0; i < 89; i++) aq.update(21);
     aq.update(DISTURBANCE_MS + 100); // 外乱 — ストリーク破棄
-    for (let i = 0; i < 29; i++) aq.update(20);
-    expect(aq.currentTier).toBe(0); // まだ 30 連続に達していない
-    aq.update(20);
+    for (let i = 0; i < 89; i++) aq.update(21);
+    expect(aq.currentTier).toBe(0); // まだ 90 連続に達していない
+    aq.update(21);
     expect(aq.currentTier).toBe(1);
   });
 
   it('tier0 では down しない(既に最悪ではなく最高品質固定の意味ではなく、単に上限クランプ確認)', () => {
     const aq = new AdaptiveQuality(4, () => {});
-    for (let i = 0; i < 40; i++) aq.update(20);
+    for (let i = 0; i < 100; i++) aq.update(21);
     expect(aq.currentTier).toBe(4); // 4 が下限(最低品質)でクランプ
   });
 });
