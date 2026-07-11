@@ -130,7 +130,9 @@ void main() {
 
   // Splashing のポップ: フレネル閃光(指数減衰)+ α フェード
   // 裁定 A36: しぶきと同時に光る bloom バーストの主犯だったため 6.0→2.0 に減衰
-  float flash = (vState == 4.0) ? 2.0 * exp(-vProg * 5.0) : 0.0;
+  // 裁定 A37: それでも bloom 閾値(1.15)を超えて発火していたため 2.0→1.05 に
+  // さらに抑制(bloom 閾値未満 — 閃光自体は消滅の合図として残す)
+  float flash = (vState == 4.0) ? 1.05 * exp(-vProg * 5.0) : 0.0;
   color *= 1.0 + flash * fresnel;
   float alpha = (0.06 + fresnel * 0.30) * ((vState == 4.0) ? 1.0 - vProg : 1.0);
 

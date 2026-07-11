@@ -8,7 +8,10 @@ import { IRID_CHUNK_GLSL } from './glass';
  * - 裁定 A36: **加算ブレンドを廃止**し通常アルファブレンド。暗い海を背景にしても
  *   「光を足す発光体」に見えないよう、フォーム白の拡散光沢のみで描く(HDR なし・
  *   色は ≤1.0)。ソフト円スプライトで中心不透明→縁フェード(粒の重なりを溶かす)
- * - kind 0 = 水滴(フォーム白、細かい粒)/ kind 1 = 膜片(虹彩 tint 弱め・大きめ)
+ * - kind 0 = 水滴(淡い水色、細かい粒)/ kind 1 = 膜片(虹彩 tint 弱め・大きめ)
+ * - 裁定 A37: 純白は暗い海上で最大コントラスト = 「光」と誤読されるため、粒色を
+ *   白 8 : 水色 2 目安(下面はさらに青く)に寄せ、不透明度も下げて向こうの海が
+ *   うっすら透けるようにした
  */
 
 export const SPRAY_VERTEX_GLSL = /* glsl */ `
@@ -65,9 +68,10 @@ void main() {
   float core = exp(-2.2 * d * d);
   float coverage = 1.0 - smoothstep(0.35, 1.0, d);
 
-  // フォーム白(#eef7f5 系)。下面をわずかに青灰にして立体感を出す(裁定 A36)。
-  vec3 foamTop = vec3(0.933, 0.969, 0.961);
-  vec3 foamUnder = vec3(0.58, 0.66, 0.70);
+  // 淡い水色(#d4ecf2 系、白 8 : 水色 2 目安)。下面は #8fc6de〜#007fff 20% 混合の
+  // 青影でさらに青く、立体感を出す(裁定 A37: 純白だと「光」と誤読されるため)。
+  vec3 foamTop = vec3(0.831, 0.925, 0.949);
+  vec3 foamUnder = vec3(0.449, 0.721, 0.897);
   float underMix = smoothstep(0.15, -0.6, vQuad.y) * 0.5;
   vec3 water = mix(foamTop, foamUnder, underMix);
 
@@ -79,7 +83,8 @@ void main() {
   vec3 col = tint * (0.55 + 0.45 * core) + uSunColor * (core * core * 0.05);
   col = min(col, vec3(1.0));  // HDR なし(A36: 加算グロー自体を廃止)
 
-  float alpha = coverage * core * vFade;
+  // 裁定 A37: 中心不透明度を ~0.75 に下げ、向こうの海がうっすら透けるように。
+  float alpha = coverage * core * vFade * 0.75;
   gl_FragColor = vec4(col, alpha);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
