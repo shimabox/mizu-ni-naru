@@ -55,9 +55,11 @@ const SPLASH_MATCH_DIST = 0.5;
 const SPLASH_MATCH_DIST_SQ = SPLASH_MATCH_DIST * SPLASH_MATCH_DIST;
 
 /**
- * フォールバック色(球が特定できない場合のデフォルト)。旧 foamTop
- * (#d4ecf2 系、白 8 : 水色 2 目安 — 裁定 A37)をそのまま踏襲。
- * 膜片(kind 1、球ポップ)にも常にこの色を渡す(虹彩ロジック自体は不変)。
+ * フォールバック色(着水位置に一致する球が特定できない場合のデフォルト、
+ * kind 0 のみ)。旧 foamTop(#d4ecf2 系、白 8 : 水色 2 目安 — 裁定 A37)を
+ * そのまま踏襲。膜片(kind 1、球ポップ)は A59 でポップした球自身の水色
+ * ハッシュに切り替えたため、このフォールバックは使わない(ポップ元の
+ * スロット/半径は常に既知なため — ingestPops 参照)。
  */
 const FALLBACK_TINT: readonly [number, number, number] = [0.831, 0.925, 0.949];
 
@@ -317,6 +319,13 @@ export class SpraySystem implements RenderSystem {
         const r = bubbles.data[o + 3];
         const rng = mulberry32(hashSeed(view.step, slot + 16, 977));
         const n = Math.round(membraneCount(r / 1.7) * this.sprayBudget);
+        // A59: 膜片(kind 1)もポップした球自身の水色ハッシュ(A57 と同一計算)を
+        // aTint として焼き込む。虹彩ロジック自体(spray.ts の film 合成)は
+        // 不変 — ベース色だけを旧 FALLBACK_TINT(白っぽい旧 foamTop)から
+        // 差し替える(水滴 kind 0 と同じ家族の色に統一)。
+        const membraneSeed = bubbleVisualSeed(slot, r);
+        bubbleWaterColor(membraneSeed, this.tintScratch);
+        const [mr, mg, mb] = this.tintScratch;
         for (let i = 0; i < n; i++) {
           // 球面上のランダム点(上半球バイアス)から接線 + 外向き
           const az = rng() * TWO_PI;
@@ -338,11 +347,10 @@ export class SpraySystem implements RenderSystem {
             nz * out + Math.sin(tAz) * tv,
             1,
             0.4 + rng() * 0.6,
-            // 膜片(kind 1)の虹彩ロジックは不変 — aTint は fragment 側の
-            // film 合成のベース色としてのみ使われ、旧 foamTop と同値
-            FALLBACK_TINT[0],
-            FALLBACK_TINT[1],
-            FALLBACK_TINT[2],
+            // A59: ポップした球自身の水色(fragment 側 film 合成のベース色)
+            mr,
+            mg,
+            mb,
           );
         }
       }

@@ -26,17 +26,28 @@ import type {
  * 球体ガラス(design-render §3、裁定 A32 で距離 LOD 2 バケット化)。
  *
  * IcosahedronGeometry の instanced 2 draw(backside 加算 → frontside
- * αブレンド)を near/far バケットそれぞれに張る(計 4 draw)。近距離は
- * detail4(現状品質)、遠距離は detail3(A51 — A32 の detail2 は A42 の
- * サイズ上限拡大(2.3)で遠距離でも画面上のフットプリントが大きくなり
- * ファセット(多角形の稜線)が視認できたため引き上げ。近距離 detail4 との
- * 中間品質)。インスタンス属性は BubbleInstanceBuffers を InnerWaterSystem と
- * 共有(アップロード 1 回)。加算優位設計なので球間ソートにほぼ非感応
- * (前後関係は buffers の遠→近順 + renderOrder の far→near 順が担保)。
+ * αブレンド)を near/far バケットそれぞれに張る(計 4 draw)。近距離・
+ * 遠距離とも detail4(A58 — 経緯は下記)。インスタンス属性は
+ * BubbleInstanceBuffers を InnerWaterSystem と共有(アップロード 1 回)。
+ * 加算優位設計なので球間ソートにほぼ非感応(前後関係は buffers の
+ * 遠→近順 + renderOrder の far→near 順が担保)。
+ *
+ * A58「多角形が再発」切り分け実験の結論: LOD_NEAR_DISTANCE(15u)は camera
+ * との 3D ユークリッド距離のみで判定するため、A56 で高さ帯上限が
+ * 6.0→9.0 に拡大されたことで、近リング寄りの水平距離が近い球でも
+ * 「カメラより 5u 前後高い」だけで容易に 15u を超え、遠距離バケットへ
+ * 押し出されるケースが増えた(実測: 遠距離判定のうち y∈[7.6,8.6] 帯の
+ * 新規ケースが dist 15.1〜18.7u に集中)。この種の球は画面上ではまだ
+ * 大きく近いため、旧 detail3(320tri)のファセットがフレネルの縁で
+ * 露呈した。実験(全球を強制的に near バケットへ寄せる/detail3→4 に
+ * 引き上げる)で稜線が消えることを確認 — LOD_NEAR_DISTANCE 自体や
+ * sim の高さ帯(config.ts、変更禁止)には触れず、遠距離バケットの
+ * ジオメトリ品質を近距離と同じ detail4 まで引き上げて解消する
+ * (draw call 数は不変、三角形数のみ +約 10%)。
  *
  * A52 不変条件(「球体は球に見えるように、妥協しない」): 本クラスは
- * applyTier を実装しない — near/far の分割レベル(detail4/detail3)は
- * どのティアでも固定。品質ラダーで負荷を吸収する対象は他システムの
+ * applyTier を実装しない — near/far の分割レベル(detail4 固定)は
+ * どのティアでも変わらない。品質ラダーで負荷を吸収する対象は他システムの
  * renderScale/dprCap・エフェクトノブのみで、主役である球体ジオメトリの
  * 丸さはティア制御の対象外。
  */
@@ -52,7 +63,7 @@ export class BubbleGlassSystem implements RenderSystem {
   constructor(sun: SunUniforms, buffers: BubbleInstanceBuffers) {
     this.buffers = buffers;
     const nearBase = new IcosahedronGeometry(1, 4); // 近距離ディテール(§3、不変)
-    const farBase = new IcosahedronGeometry(1, 3); // 遠距離 LOD(A32 detail2 → A51 detail3)
+    const farBase = new IcosahedronGeometry(1, 4); // 遠距離 LOD(A32 detail2 → A51 detail3 → A58 detail4)
     this.nearGeometry = makeInstanced(nearBase, buffers.near);
     this.farGeometry = makeInstanced(farBase, buffers.far);
 

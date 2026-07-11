@@ -141,8 +141,14 @@ export class InnerWaterSystem implements RenderSystem {
     // A51 はガラスと書き割りのみ引き上げ、水の体積ジオメトリを直し忘れていた。
     // A48 で水がほぼ不透明になり水のシルエットが球体知覚を支配するため、
     // ガラス(near detail4 / far detail2)と同レベルまで引き上げてカクつきを解消する。
+    // A58: 「多角形が再発」— A56 の高さ帯拡大(2.6〜9.0)で近リング寄りの
+    // 球が y 方向の距離だけで LOD_NEAR_DISTANCE(15u)を超えるケースが増え、
+    // 画面上まだ大きい球が旧 far detail3(320tri)のファセットを露呈した
+    // (詳細は BubbleGlassSystem.ts の A58 コメント参照)。水の体積も
+    // ガラスと同じく far を detail4 に統一する(near と同レベル、LOD 差は
+    // 実質ジオメトリではなく draw call の分岐のみに縮退)。
     const volumeNearBase = new IcosahedronGeometry(1, 4); // 近距離ディテール(A54 — ガラス近距離と同一detail4に統一)
-    const volumeFarBase = new IcosahedronGeometry(1, 3); // 遠距離 LOD(A54 — detail1→detail3 に引き上げ、シルエットをガラスに揃える)
+    const volumeFarBase = new IcosahedronGeometry(1, 4); // 遠距離 LOD(A32→A51 detail1→A54 detail3→A58 detail4)
     this.volumeNearGeometry = makeInstanced(volumeNearBase, buffers.near);
     this.volumeFarGeometry = makeInstanced(volumeFarBase, buffers.far);
     this.volumeMaterial = new ShaderMaterial({
