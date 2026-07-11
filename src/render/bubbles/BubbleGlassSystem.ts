@@ -27,8 +27,10 @@ import type {
  *
  * IcosahedronGeometry の instanced 2 draw(backside 加算 → frontside
  * αブレンド)を near/far バケットそれぞれに張る(計 4 draw)。近距離は
- * detail4(現状品質)、遠距離は detail2(A32 — 「遠くはきちんと描画しなくて
- * いい」)。インスタンス属性は BubbleInstanceBuffers を InnerWaterSystem と
+ * detail4(現状品質)、遠距離は detail3(A51 — A32 の detail2 は A42 の
+ * サイズ上限拡大(2.3)で遠距離でも画面上のフットプリントが大きくなり
+ * ファセット(多角形の稜線)が視認できたため引き上げ。近距離 detail4 との
+ * 中間品質)。インスタンス属性は BubbleInstanceBuffers を InnerWaterSystem と
  * 共有(アップロード 1 回)。加算優位設計なので球間ソートにほぼ非感応
  * (前後関係は buffers の遠→近順 + renderOrder の far→near 順が担保)。
  */
@@ -44,7 +46,7 @@ export class BubbleGlassSystem implements RenderSystem {
   constructor(sun: SunUniforms, buffers: BubbleInstanceBuffers) {
     this.buffers = buffers;
     const nearBase = new IcosahedronGeometry(1, 4); // 近距離ディテール(§3、不変)
-    const farBase = new IcosahedronGeometry(1, 2); // 遠距離 LOD(A32)
+    const farBase = new IcosahedronGeometry(1, 3); // 遠距離 LOD(A32 detail2 → A51 detail3)
     this.nearGeometry = makeInstanced(nearBase, buffers.near);
     this.farGeometry = makeInstanced(farBase, buffers.far);
 

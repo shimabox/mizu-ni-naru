@@ -50,7 +50,7 @@ export class BackdropBubbles implements RenderSystem {
   private countFraction = 1.0;
 
   constructor(sun: SunUniforms) {
-    const base = new IcosahedronGeometry(1, 1); // 遠景・小径 — 低ディテールで十分
+    const base = new IcosahedronGeometry(1, 2); // 遠景・小径 — A51: detail1→2 でファセット低減
     this.geometry = new InstancedBufferGeometry();
     this.geometry.setIndex(base.getIndex());
     this.geometry.setAttribute(
