@@ -25,8 +25,8 @@ const rollAll = (fieldCount: number, seed: number): SlotPlacement[] => {
   return placements as SlotPlacement[];
 };
 
-describe('SlotField(§2.3 拡張 — 外側環状フィールド配置、A32)', () => {
-  it('配置は設計帯に収まる(R、半径 [8,26] 近傍、y、bob 位相)', () => {
+describe('SlotField(§2.3 拡張 — 外側環状フィールド配置、A32、A35 で半径帯拡張)', () => {
+  it('配置は設計帯に収まる(R、半径 [FIELD_RADIUS_MIN,FIELD_RADIUS_MAX] 近傍、y、bob 位相)', () => {
     const placements = rollAll(28, 1);
     const jitterSlack = 2; // 角/半径ジッターの余裕込みで大まかに帯を確認
     for (const out of placements) {

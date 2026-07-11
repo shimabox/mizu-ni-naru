@@ -4,8 +4,9 @@ import { IRID_CHUNK_GLSL, MIZU_BLUE_GLSL } from './glass';
 import { SKY_CHUNK_GLSL, SKY_UNIFORMS_GLSL } from './sky';
 
 /**
- * 解析反射に参加する球の上限(A30)。容量は 16 だが描画コスト維持のため
- * CPU がカメラに近い 8 球を毎フレーム選抜して詰める(OceanSystem.packBubbles)。
+ * 解析反射に参加する球の上限(A30、A35 でも不変)。容量(BUBBLE_CAPACITY)は
+ * 128 だが描画コスト維持のため CPU がカメラに近い 8 球を毎フレーム選抜して
+ * 詰める(OceanSystem.packBubbles)。
  */
 export const MAX_REFLECT_BUBBLES = 8;
 

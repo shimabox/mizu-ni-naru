@@ -43,14 +43,15 @@ export const RING_Y_MIN = 2.6;
 export const RING_Y_MAX = 6.0;
 
 /**
- * 近リングの総スロット数(A32: SlotRing は不変 — このスロット数分だけ従来の
- * 緩い二重リングを使う)。desktop 40 = 近 12 + 外側フィールド 28、
- * mobile 14 = 近 7 + フィールド 7。
+ * 近リングの総スロット数(A30 以降不変: SlotRing はこのスロット数分だけ従来の
+ * 緩い二重リングを使う)。desktop 96 = 近 12 + 外側フィールド 84(A35)、
+ * mobile 24 = 近 7 + フィールド 17(A35)。
  */
 export const NEAR_RING_COUNT_DESKTOP = 12;
 export const NEAR_RING_COUNT_MOBILE = 7;
 /**
- * 外側環状フィールド(A32、SlotField)。半径は幾何スパイラル
+ * 外側環状フィールド(A32 で導入、A35 で半径帯を [8,26] → [8,45] に拡張)。
+ * 半径は幾何スパイラル
  * r(t) = FIELD_RADIUS_MIN·(FIELD_RADIUS_MAX/FIELD_RADIUS_MIN)^t
  * (t = フィールド内インデックス / フィールド数 ∈ [0,1))— dr/dt ∝ r なので
  * 等間隔 t に対し外側ほど半径間隔が開く = 密度∝1/r(「外へ薄くなる」)。
@@ -59,7 +60,7 @@ export const NEAR_RING_COUNT_MOBILE = 7;
  * SEPARATION_MARGIN、SEPARATION_MAX_TRIES を再利用)。
  */
 export const FIELD_RADIUS_MIN = 8;
-export const FIELD_RADIUS_MAX = 26;
+export const FIELD_RADIUS_MAX = 45;
 export const FIELD_ANGLE_JITTER = 0.35; // rad(黄金角スパイラルは疎なので近リングより広く許容)
 export const FIELD_RADIAL_JITTER = 1.4; // u
 /** 角/半径ジッター(±)。リング間 5.1° 近接ペアでも y 再ロールで解ける疎さ。 */

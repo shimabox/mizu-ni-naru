@@ -23,12 +23,14 @@ export const KIND_INDEX = { H: 0, O: 1, H2: 2 } as const;
 export type AtomKind = keyof typeof KIND_INDEX;
 
 /**
- * 球スロット数(裁定 A30 で 7/5 → 12/7、裁定 A32 で 12/7 → 40/14 に増量)。
- * A32: 近リング(既存の緩い二重リング — 変更なし)12/7 + 外側環状フィールド 28/7。
+ * 球スロット数(裁定 A30 で 7/5 → 12/7、裁定 A32 で 12/7 → 40/14、
+ * 裁定 A35 で 40/14 → 96/24 に増量)。
+ * 近リング(既存の緩い二重リング — A30 以降不変)12/7 + 外側環状フィールド
+ * (A35: desktop 84 / mobile 17、半径帯を [8,26] → [8,45] に拡張し外へ薄く)。
  * モバイル判定は app 層(viewport width < 768 — 裁定 A16)。
  */
-export const SLOT_COUNT_DESKTOP = 40;
-export const SLOT_COUNT_MOBILE = 14;
+export const SLOT_COUNT_DESKTOP = 96;
+export const SLOT_COUNT_MOBILE = 24;
 
 /**
  * 球体 FSM の状態インデックス(statePacked の整数部 — 裁定 A3 で sim 名に統一)。
@@ -45,9 +47,9 @@ export const BUBBLE_STATE = {
 } as const;
 export type BubbleStateName = keyof typeof BUBBLE_STATE;
 
-/** view 固定容量(design-sim §8 ワースト見積 × 2 の切り上げ。成長しない設計 — 裁定 A5、A30、A32 で改訂)。 */
-export const BUBBLE_CAPACITY = 64; // render のインスタンス/uniform 配列は 64 固定(A32、≥ SLOT_COUNT_DESKTOP=40)
-export const ATOM_VIEW_CAPACITY = 2048; // ワースト ≈ 40 球 × 26 体 = 1040
-export const DROPLET_VIEW_CAPACITY = 4096; // ワースト ≈ 40 球 × 64(球内キャップ)= 2560
-export const SPLASH_VIEW_CAPACITY = 64; // 同一フレーム最大 = スロット数 40(BUBBLE_CAPACITY と同格)
-export const RIPPLE_VIEW_CAPACITY = 128; // 雫着水+溶解イベント(球が増えても実勢 ≤ 10/frame 程度の余裕)
+/** view 固定容量(design-sim §8 ワースト見積 × 2 の切り上げ。成長しない設計 — 裁定 A5、A30、A32、A35 で改訂)。 */
+export const BUBBLE_CAPACITY = 128; // render のインスタンス/uniform 配列は 128 固定(A35、≥ SLOT_COUNT_DESKTOP=96)
+export const ATOM_VIEW_CAPACITY = 4096; // ワースト ≈ 96 球 × 26 体 ≈ 2500
+export const DROPLET_VIEW_CAPACITY = 8192; // ワースト ≈ 96 球 × 64(球内キャップ)= 6144
+export const SPLASH_VIEW_CAPACITY = 128; // 同一フレーム最大 = スロット数 96(BUBBLE_CAPACITY と同格)
+export const RIPPLE_VIEW_CAPACITY = 256; // 雫着水+溶解+水面バウンド(A34)イベント。球増量分の余裕込み
