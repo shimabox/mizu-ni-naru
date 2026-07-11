@@ -84,6 +84,12 @@ app/        合成ルート(DI・rAF ループ・URL パラメータ・オーバ
 
 テストは 205 本(Vitest。sim/render/app/contract の各層を横断)。
 
+### Dependency Graph
+
+![Dependency Graph](dependency-graph.svg)
+
+`npm run dependency-graph` で `dependency-graph.svg` をリポジトリルートに生成する(dependency-cruiser + Graphviz `dot` が必要)。
+
 ## デプロイ
 
 `npm run build` の出力 `dist/` を任意の静的ホスティングへそのまま配置できる
