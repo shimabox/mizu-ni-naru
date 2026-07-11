@@ -2,9 +2,11 @@ import { MIZU_BLUE_GLSL } from './glass';
 import { SKY_CHUNK_GLSL, SKY_UNIFORMS_GLSL } from './sky';
 
 /**
- * 雫(球内を落ちる水滴)のインポスター(design-render §5)。
+ * 雫(球内を落ちる水滴)のインポスター(design-render §5、裁定 A31 で改訂)。
  *
- * Mizu 伝統の白コア → #007fff リム + フレネル + 解析スカイ反射。
+ * 白コア支配をやめ、溜まった水(InnerWater 体積/キャップ)と同じ #007fff 系の
+ * 透明な水色を本体に統一 — 「同じ水」に見せる(A31)。フレネル縁と空の
+ * 映り込み・太陽ハイライトは水滴らしさとしてごく控えめに残す。
  * sway の位置成分は sim が posr に焼き込み済み(裁定 A9)—
  * レンダラーは位置に足さず、aux は pop-in(spawnStep)と tint(seed)のみ。
  * 円外 discard + 不透明 + depthWrite ON。
@@ -51,6 +53,7 @@ varying vec3 vToCam;
 varying float vSeed;
 ${SKY_CHUNK_GLSL}
 ${MIZU_BLUE_GLSL}
+const vec3 MIZU_DEEP = vec3(0.0, 0.030, 0.160); // InnerWater 体積と同一パレット(A31)
 
 void main() {
   float r2 = dot(vCorner, vCorner);
@@ -61,14 +64,16 @@ void main() {
   vec3 n = normalize(uCamRight * vCorner.x + uCamUp * vCorner.y + vToCam * z);
   vec3 viewDir = normalize(vWorldPos - cameraPosition);
 
-  // 白コア → #007fff リム(Mizu 伝統グラデ)
-  vec3 body = mix(vec3(0.92), MIZU_BLUE, smoothstep(0.05, 0.85, 1.0 - z));
-  vec3 color = body * (0.5 + 0.5 * z);
+  // 本体: 溜まった水と同じ #007fff 系(A31)。中心をわずかに明るく、
+  // 縁は MIZU_DEEP 寄りに沈めて球面の陰影を出す(白コアなし)
+  vec3 body = mix(MIZU_DEEP, MIZU_BLUE, 0.35 + 0.65 * z);
+  vec3 color = body * (0.75 + 0.25 * z);
 
+  // フレネル縁と空の映り込みはごく控えめに(水滴らしさの最小限の主張)
   float fresnel = pow(1.0 - z, 2.5);
-  color += sky(reflect(viewDir, n)) * (0.18 + 0.5 * fresnel);
+  color += sky(reflect(viewDir, n)) * (0.04 + 0.14 * fresnel);
   vec3 halfDir = normalize(uSunDir - viewDir);
-  color += uSunColor * (0.8 * pow(max(dot(n, halfDir), 0.0), 60.0));
+  color += uSunColor * (0.30 * pow(max(dot(n, halfDir), 0.0), 120.0));
 
   // seed の tint 微変動(±8%)
   color *= 0.92 + 0.16 * vSeed;

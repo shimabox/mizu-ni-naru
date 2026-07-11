@@ -16,9 +16,10 @@ import { createBillboardQuadGeometry, writeCameraBasis } from './billboard';
 const V4 = 4;
 
 /**
- * 雫インポスター(design-render §5)— 1 draw・不透明 + discard・
- * depthWrite ON。白コア → #007fff。sway は sim が posr に焼き込み済み(A9)
- * なので位置には何も足さない。aux は pop-in(spawnStep)と tint(seed)のみ。
+ * 雫インポスター(design-render §5、裁定 A31)— 1 draw・不透明 + discard・
+ * depthWrite ON。溜まった水と同じ #007fff 系の水色が本体(A31 — 白コアなし)。
+ * sway は sim が posr に焼き込み済み(A9)なので位置には何も足さない。
+ * aux は pop-in(spawnStep)と tint(seed)のみ。
  */
 export class DropletSystem implements RenderSystem {
   public readonly object: Mesh;
