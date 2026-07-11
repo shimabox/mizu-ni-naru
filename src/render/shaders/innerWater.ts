@@ -88,11 +88,13 @@ void main() {
   float tPlane = (rd.y > 0.0) ? (vWaterPlaneY - vWorldPos.y) / rd.y : 1e9;
   float len = clamp(min(tExit, tPlane), 0.0, 2.0 * vR);
 
-  vec3 absorb = exp(-len / max(vR, 1e-5) * vec3(1.9, 0.75, 0.35)); // 青が生き残る
-  vec3 color = mix(MIZU_BLUE * 0.85, MIZU_DEEP, 1.0 - absorb.b)
+  // A39: 「色が濃い」— 吸収を弱め(1.9/0.75/0.35 → 1.2/0.5/0.24)、深色への
+  // 沈み込みを 0.6 倍に、透過も上げて向こうの景色がうっすら通る薄い水色に
+  vec3 absorb = exp(-len / max(vR, 1e-5) * vec3(1.2, 0.5, 0.24)); // 青が生き残る
+  vec3 color = mix(MIZU_BLUE * 0.95, MIZU_DEEP, (1.0 - absorb.b) * 0.6)
              + uSssColor * 0.10 *
                texture2D(uNoise, vLocalPos.xz * 2.0 + uTimeSec * 0.05).r;
-  float alpha = clamp(0.55 + 0.45 * (1.0 - absorb.b), 0.0, 0.92);
+  float alpha = clamp(0.42 + 0.38 * (1.0 - absorb.b), 0.0, 0.8);
   alpha *= smoothstep(0.0, 0.03, vFill); // 空球の極小レンズを消す
 
   gl_FragColor = vec4(color, alpha);

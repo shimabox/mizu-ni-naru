@@ -109,7 +109,9 @@ void main() {
   float ndv = max(dot(-viewDir, n), 0.0);
   float fresnel = 0.02 + 0.98 * pow(1.0 - ndv, 5.0);
 
-  vec3 body = mix(MIZU_BLUE * 0.85, MIZU_DEEP, 0.35 + 0.45 * vFill);
+  // A39: 体積(innerWater)の淡色化に合わせ、キャップも明るめ基調 + 浅めの
+  // 深色ミックスへ(境目で色が跳ねない — A31 の地続き原則を維持)
+  vec3 body = mix(MIZU_BLUE * 0.95, MIZU_DEEP, 0.22 + 0.34 * vFill);
   body += uSssColor * min(length(n.xz) * 1.4, 0.35);   // リング波頭のターコイズ(控えめ)
 
   // 空の映り込みは MIZU_BLUE で色相を引き戻してから弱めに混ぜる(白飛び防止)
@@ -121,7 +123,7 @@ void main() {
   // 縁(92% 以遠)はメニスカス帯(§3)へ滑らかに接続
   color += MIZU_BLUE * smoothstep(0.92, 1.0, vRadial) * 1.1;
 
-  float alpha = 0.88 * smoothstep(0.0, 0.03, vFill);
+  float alpha = 0.8 * smoothstep(0.0, 0.03, vFill); // A39: 淡色化に合わせ僅かに透過
   gl_FragColor = vec4(color, alpha);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
