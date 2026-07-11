@@ -15,10 +15,11 @@ export const BUBBLE_STATE_TRANSFORM_GLSL = /* glsl */ `
 // state 駆動の変形係数(§3)— grow / stretchY / alive / wobbleGain を返す
 vec4 bubbleTransform(float state, float prog) {
   float grow = (state == 0.0) ? 0.6 + 0.5 * prog - 0.1 * sin(prog * 9.0) : 1.0;
+  // A45: Straining の予兆 stretch ランプを ~4 割に縮小(0.10→0.04 — A29 は不変)
   float strain = (state == 2.0) ? prog : 0.0;
   // Falling: 落下開始 ≈0.5 s で張り(+0.10)を解き +0.04 の空力感のみ残す(A29)
   float fallRelax = (state == 3.0) ? min(prog * 8.0, 1.0) : 0.0;
-  float stretchY = 1.0 + strain * 0.10
+  float stretchY = 1.0 + strain * 0.04
                  + ((state == 3.0) ? mix(0.10, 0.04, fallRelax) : 0.0);
   // 中身(水)は Splashing 進入と同時に消える(§3 — 海の FX が受け継ぐ)
   float alive = (state >= 4.0) ? 0.0 : 1.0;

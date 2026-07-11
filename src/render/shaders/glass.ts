@@ -62,15 +62,17 @@ void main() {
   float grow = (state == 0.0) ? 0.6 + 0.5 * prog - 0.1 * sin(prog * 9.0) : 1.0;
   // Straining: 縦呼吸(張りの予兆)。Falling: 落下開始 ≈0.5 s で張り(+0.10)を
   // 解き、微小な空力ストレッチ(+0.04)だけ残して剛体的にまっすぐ落ちる(A29)
+  // A45: Straining の予兆 stretch ランプを ~4 割に縮小(0.10→0.04 — A29 は不変)
   float strain = (state == 2.0) ? prog : 0.0;
   float fallRelax = (state == 3.0) ? min(prog * 8.0, 1.0) : 0.0;
-  float stretchY = 1.0 + strain * 0.10
+  float stretchY = 1.0 + strain * 0.04
                  + ((state == 3.0) ? mix(0.10, 0.04, fallRelax) : 0.0);
   p *= vec3(inversesqrt(stretchY), stretchY, inversesqrt(stretchY));
-  // 表面さざ波(wobble ∈ [0,1] は sim 供給)— Falling では張りと同時に減衰(A29)
+  // 表面さざ波(wobble ∈ [0,1] は sim 供給)— Falling では張りと同時に減衰(A29)。
+  // A45: wobble 視覚ゲインを ~4 割に縮小(0.05→0.02)
   float wobbleGain = 1.0 - fallRelax;
   p += position * wobble * wobbleGain
-     * 0.05 * sin(p.y * 7.0 + uTimeSec * 12.0 + seed * 6.2832);
+     * 0.02 * sin(p.y * 7.0 + uTimeSec * 12.0 + seed * 6.2832);
   // Splashing: 膜の拡張(消滅は α 側)。Dead: 縮退 quad = 実質カリング(A18)
   float pop = (state == 4.0) ? 1.0 + 0.25 * prog : 1.0;
   float alive = (state >= 5.0) ? 0.0 : 1.0;

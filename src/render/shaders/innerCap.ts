@@ -18,7 +18,7 @@ export const RIPPLE_NEAR_COUNT = 12;
  *
  * 単位円盤グリッドを per-instance で cap 半径にスケール:
  * capR = √(Rv² − wl²)(頂点シェーダ内で導出 — CPU 前処理なし)。
- * 頂点は緩い揺れのみ(Straining は wobble 連動 ×3)。フラグメント法線は
+ * 頂点は緩い揺れのみ(Straining は wobble 連動 ×1.8 — A45)。フラグメント法線は
  * InnerRippleView 由来の解析リング波(uniform リングバッファ、カメラ近傍
  * 12 球 × 6 本 — A32)。縁はメニスカス帯(§3)と同じ #007fff 発光で滑らかに
  * 接続する。本体は体積(innerWater)と同じ濃い青と地続きに見えるよう白い
@@ -52,9 +52,10 @@ void main() {
 
   vec2 disk = position.xz;             // 単位円盤
   vec2 capXZ = disk * capR;
-  // 広域の緩い揺れ(振幅 0.008R、Straining は wobble 連動で ×3。
-  // Falling は wobbleGain(tf.w)で減衰 — 水面も暴れず剛体的に落ちる A29)
-  float amp = 0.008 * R * (1.0 + 2.0 * wobble * tf.w) * tf.z;
+  // 広域の緩い揺れ(振幅 0.008R、Straining は wobble 連動で ×1.8 — A45 で
+  // ×3→×1.8 に縮小、~4 割の予兆に。Falling は wobbleGain(tf.w)で減衰 —
+  // 水面も暴れず剛体的に落ちる A29)
+  float amp = 0.008 * R * (1.0 + 0.8 * wobble * tf.w) * tf.z;
   float sway = sin(capXZ.x * 5.0 + uTimeSec * 1.3 + aMisc.y * 6.283)
              + sin(capXZ.y * 6.2 - uTimeSec * 1.7 + aMisc.y * 4.1);
   vec3 wp = center + vec3(capXZ.x, wlv + amp * sway, capXZ.y);
