@@ -4,6 +4,17 @@ import {
   WATER_TINT_GLSL,
 } from './glass';
 
+/** 球ごとの InnerRipple リングバッファ本数(§4b — InnerWaterSystem と共有)。 */
+export const RIPPLES_PER_BUBBLE = 6;
+
+/**
+ * InnerRipple uniform を張る球数(裁定 A32 — 「カメラ近傍 12 球のみ」)。
+ * BubbleInstanceBuffers.sync() がカメラ距離で毎フレーム選抜し、
+ * aMisc.x(vSlot)を 0..RIPPLE_NEAR_COUNT-1 のインデックスとして詰め替える
+ * (対象外の遠方球は vSlot=-1 でキャップ/体積の波紋ループをスキップ — 微波のみ)。
+ */
+export const RIPPLE_NEAR_COUNT = 12;
+
 /**
  * 球内の水 — 体積パス(design-render §4a)。
  *
@@ -44,6 +55,7 @@ varying float vR;
 varying float vWaterPlaneY;
 varying float vFill;
 varying float vSeed;
+varying float vSlot;
 
 void main() {
   vec3 center = mix(aPrevA.xyz, aCurrA.xyz, uAlpha);
@@ -66,6 +78,7 @@ void main() {
   vWaterPlaneY = center.y + wl * tf.x * tf.z;
   vFill = fill;
   vSeed = aMisc.y;
+  vSlot = aMisc.x;
   gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
 }
 `;
@@ -74,7 +87,9 @@ export const INNER_WATER_FRAGMENT_GLSL = /* glsl */ `
 precision highp float;
 uniform sampler2D uNoise;
 uniform float uTimeSec;
+uniform float uStepF;
 uniform vec3 uSssColor;
+uniform vec4 uInnerRipples[${RIPPLE_NEAR_COUNT * RIPPLES_PER_BUBBLE}];  // [x, z, birthStepF, strength] × 近傍 12 球 × 6 本(A32/A43 — キャップと同一配列を共有)
 varying vec3 vWorldPos;
 varying vec3 vCenter;
 varying vec3 vLocalPos;
@@ -82,6 +97,7 @@ varying float vR;
 varying float vWaterPlaneY;
 varying float vFill;
 varying float vSeed;
+varying float vSlot;  // 0..${RIPPLE_NEAR_COUNT - 1} = uInnerRipples インデックス、-1 = 対象外(A32)
 ${MIZU_BLUE_GLSL}
 ${WATER_TINT_GLSL}
 const vec3 MIZU_DEEP = vec3(0.0, 0.030, 0.160);
@@ -110,6 +126,28 @@ void main() {
                texture2D(uNoise, vLocalPos.xz * 2.0 + uTimeSec * 0.05).r;
   float alpha = clamp(0.42 + 0.38 * (1.0 - absorb.b), 0.0, 0.8) * mix(1.0, 0.75, tint);
   alpha *= smoothstep(0.0, 0.03, vFill); // 空球の極小レンズを消す
+
+  // A43: 下から見える波紋 — キャップと同じ解析リング波(伝播 0.9 u/s・
+  // 減衰 1.8/s、innerCap.ts と同一定数)を「水中を透過する光の明暗」として
+  // 評価する。エントリ点の球ローカル (x, z) で評価し、水面からの深さで
+  // exp 減衰(表層で強く、底で弱く)。ギラつかせないよう控えめな乗算のみ。
+  if (vSlot >= 0.0) {
+    vec2 localXZ = vWorldPos.xz - vCenter.xz;
+    float ringGlow = 0.0;
+    int base = int(vSlot + 0.5) * 6;
+    for (int k = 0; k < 6; k++) {
+      vec4 rp = uInnerRipples[base + k];
+      vec2 d = localXZ - rp.xy;
+      float dist = length(d) + 1e-4;
+      float age = max((uStepF - rp.z) / 60.0, 0.0);
+      float radius = 0.9 * age;
+      float env = exp(-6.0 * abs(dist - radius)) * exp(-1.8 * age) * rp.w;
+      ringGlow += env * sin(40.0 * (dist - radius));
+    }
+    float depth = max(vWaterPlaneY - vWorldPos.y, 0.0);
+    float depthAtten = exp(-depth * 1.5);
+    color = max(color * (1.0 + ringGlow * depthAtten * 0.35), vec3(0.0));
+  }
 
   gl_FragColor = vec4(color, alpha);
   #include <tonemapping_fragment>

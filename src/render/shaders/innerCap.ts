@@ -3,19 +3,18 @@ import {
   MIZU_BLUE_GLSL,
   WATER_TINT_GLSL,
 } from './glass';
-import { BUBBLE_STATE_TRANSFORM_GLSL, WATER_VISUAL_RATIO } from './innerWater';
+import {
+  BUBBLE_STATE_TRANSFORM_GLSL,
+  RIPPLES_PER_BUBBLE,
+  RIPPLE_NEAR_COUNT,
+  WATER_VISUAL_RATIO,
+} from './innerWater';
 import { SKY_CHUNK_GLSL, SKY_UNIFORMS_GLSL } from './sky';
 
-/** 球ごとの InnerRipple リングバッファ本数(§4b — InnerWaterSystem と共有)。 */
-export const RIPPLES_PER_BUBBLE = 6;
-
-/**
- * InnerRipple uniform を張る球数(裁定 A32 — 「カメラ近傍 12 球のみ」)。
- * BubbleInstanceBuffers.sync() がカメラ距離で毎フレーム選抜し、
- * aMisc.x(vSlot)を 0..RIPPLE_NEAR_COUNT-1 のインデックスとして詰め替える
- * (対象外の遠方球は vSlot=-1 でキャップ波紋ループをスキップ — 微波のみ)。
- */
-export const RIPPLE_NEAR_COUNT = 12;
+// RIPPLES_PER_BUBBLE / RIPPLE_NEAR_COUNT は innerWater.ts が定義元(A43 で体積
+// シェーダも同じリングバッファを共有するため移設)。既存の import 元
+// ('../shaders/innerCap') を変えずに済むようここで再エクスポートする。
+export { RIPPLES_PER_BUBBLE, RIPPLE_NEAR_COUNT };
 
 /**
  * 球内水面キャップ — ミニ海(design-render §4b、裁定 A31/A32 で改訂)。

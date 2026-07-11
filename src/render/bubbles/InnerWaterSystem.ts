@@ -97,8 +97,10 @@ const createCapDiskGeometry = (
  * per-instance 属性は BubbleGlassSystem と同一の BubbleInstanceBuffers
  * (near/far バケット)を共有。InnerRippleView のイベントはレンダー側
  * リングバッファ(カメラ近傍 RIPPLE_NEAR_COUNT 球 × 6 本、古い順上書き)に
- * 保持し、uniform `uInnerRipples`で解析リング波としてキャップの法線に
- * 注入する(A7/A8/A32)。
+ * 保持し、uniform `uInnerRipples`として解析リング波をキャップの法線と
+ * 体積の透過光(水中を通る明暗の輪 — A43)の双方に注入する(A7/A8/A32)。
+ * volumeMaterial / capMaterial は同一の JS 配列(this.rippleUniform)を
+ * 参照するため更新は ingestRipples() の 1 箇所で両方に反映される。
  */
 export class InnerWaterSystem implements RenderSystem {
   public readonly object: Group;
@@ -141,8 +143,12 @@ export class InnerWaterSystem implements RenderSystem {
       uniforms: {
         uAlpha: { value: 0 },
         uTimeSec: { value: 0 },
+        uStepF: { value: 0 },
         uNoise: { value: noiseTexture },
         uSssColor: { value: sssColor },
+        // A43: キャップと同じリングバッファ配列を共有(体積側でも水中の
+        // 光の輪として評価 — 更新は ingestRipples() の 1 箇所のみ)
+        uInnerRipples: { value: this.rippleUniform },
       },
       transparent: true,
       depthTest: true,
@@ -209,6 +215,7 @@ export class InnerWaterSystem implements RenderSystem {
 
     this.volumeMaterial.uniforms.uAlpha.value = frame.alpha;
     this.volumeMaterial.uniforms.uTimeSec.value = frame.timeSec;
+    this.volumeMaterial.uniforms.uStepF.value = frame.stepF;
     this.capMaterial.uniforms.uAlpha.value = frame.alpha;
     this.capMaterial.uniforms.uTimeSec.value = frame.timeSec;
     this.capMaterial.uniforms.uStepF.value = frame.stepF;
