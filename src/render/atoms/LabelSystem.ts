@@ -12,11 +12,17 @@ import type { AtomViewAttributes } from './AtomViewAttributes';
 import { createLabelAtlasTexture } from './LabelAtlas';
 import { createBillboardQuadGeometry, writeCameraBasis } from './billboard';
 
+/** 距離カットオフ(裁定 A32)。判読できなくなる距離の視覚調整値(u)。 */
+const LABEL_CUTOFF_DISTANCE = 15;
+const LABEL_CUTOFF_FADE = 4;
+
 /**
  * 原子 = 文字(design-render §5 改: 文字が主役)— 1 draw。
  * 発光球インポスターは廃止し、文字そのものが粒子として漂う。
  * 縁取り焼き込みアトラス + per-atom 着色 + **通常アルファブレンド**
  * (加算は白い空で消えるため不採用)。depthTest on / depthWrite off。
+ * 距離カットオフ(A32): カメラから遠い球の文字は頂点シェーダで縮退(draw
+ * call は増やさない)— LOD バケット境界(LOD_NEAR_DISTANCE)とおおむね揃える。
  */
 export class LabelSystem implements RenderSystem {
   public readonly object: Mesh;
@@ -46,6 +52,8 @@ export class LabelSystem implements RenderSystem {
         uStepF: { value: 0 },
         uCamRight: { value: new Vector3(1, 0, 0) },
         uCamUp: { value: new Vector3(0, 1, 0) },
+        uLabelCutoffDist: { value: LABEL_CUTOFF_DISTANCE },
+        uLabelCutoffFade: { value: LABEL_CUTOFF_FADE },
       },
       transparent: true,
       depthTest: true,

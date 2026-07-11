@@ -1,4 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import {
+  SLOT_COUNT_DESKTOP,
+  SLOT_COUNT_MOBILE,
+} from '../../src/contract/WorldSpec';
 import { MizuNiNaruSim } from '../../src/sim/MizuNiNaruSim';
 
 /**
@@ -79,47 +83,49 @@ const runGolden = (slotCount: number): GoldenRecord => {
 
 /**
  * 記録値(seed=7・1800 step)。再記録時は上の手順コメントを読むこと。
- * 2026-07-11 再記録: A30(12/7 球・二重リング SlotRing)で配置の RNG 消費と
- * スロット数が意図して変わったため(変更管理手順に基づく再記録)。
+ * 2026-07-11 再記録: A32(40/14 球 = 近リング 12/7 不変 + 外側環状フィールド
+ * 28/7 SlotField)で配置の RNG 消費とスロット数が意図して変わったため
+ * (変更管理手順に基づく再記録)。desktop はさらに校正ノブ調整
+ * (SPAWN_INTERVAL_STEPS_DESKTOP 40→44、config.ts 参照)で再々記録。
  */
 const EXPECTED_DESKTOP: GoldenRecord = {
-  bubbles: 82.64781701518586,
-  bubblesPrev: 82.65873884414759,
-  atoms: 836.3408926408738,
-  atomsColor: 546.8437252640724,
-  droplets: 28.703170500695705,
-  atomCount: 202,
-  dropletCount: 5,
-  splashSum: 2,
-  rippleSum: 152,
-  h: 99,
-  o: 71,
-  h2: 32,
-  dropletsLive: 5,
-  splashesTotal: 2,
-  absorbedTotal: 110,
-  dissolvedTotal: 42,
-  meanFill01: 0.3122864617617281,
+  bubbles: 294.92617119963506,
+  bubblesPrev: 294.94060419272864,
+  atoms: 3264.266298341565,
+  atomsColor: 1637.4129405915737,
+  droplets: 115.36738757789135,
+  atomCount: 629,
+  dropletCount: 20,
+  splashSum: 7,
+  rippleSum: 511,
+  h: 329,
+  o: 226,
+  h2: 74,
+  dropletsLive: 20,
+  splashesTotal: 7,
+  absorbedTotal: 379,
+  dissolvedTotal: 132,
+  meanFill01: 0.3253196862878686,
 };
 
 const EXPECTED_MOBILE: GoldenRecord = {
-  bubbles: 47.97128150227945,
-  bubblesPrev: 47.84718905808404,
-  atoms: 531.0043353140354,
-  atomsColor: 356.214117616415,
-  droplets: 21.089731879532337,
-  atomCount: 133,
-  dropletCount: 4,
-  splashSum: 1,
-  rippleSum: 100,
-  h: 67,
-  o: 45,
-  h2: 21,
-  dropletsLive: 4,
-  splashesTotal: 1,
-  absorbedTotal: 84,
-  dissolvedTotal: 16,
-  meanFill01: 0.3129974623659507,
+  bubbles: 122.69174901340088,
+  bubblesPrev: 122.70254082342578,
+  atoms: 1986.4028758518398,
+  atomsColor: 720.9103918075562,
+  droplets: 13.10653506219387,
+  atomCount: 267,
+  dropletCount: 5,
+  splashSum: 3,
+  rippleSum: 185,
+  h: 132,
+  o: 97,
+  h2: 38,
+  dropletsLive: 5,
+  splashesTotal: 3,
+  absorbedTotal: 144,
+  dissolvedTotal: 41,
+  meanFill01: 0.2845911103805818,
 };
 
 const assertGolden = (actual: GoldenRecord, expected: GoldenRecord): void => {
@@ -137,12 +143,12 @@ const assertGolden = (actual: GoldenRecord, expected: GoldenRecord): void => {
 };
 
 describe('MizuNiNaruSim ゴールデン(seed=7・1800 step)', () => {
-  it('desktop(12 球)が記録値と一致する', () => {
-    assertGolden(runGolden(12), EXPECTED_DESKTOP);
+  it('desktop(40 球 = 近 12 + フィールド 28)が記録値と一致する', () => {
+    assertGolden(runGolden(SLOT_COUNT_DESKTOP), EXPECTED_DESKTOP);
   });
 
-  it('mobile(7 球)が記録値と一致する', () => {
-    assertGolden(runGolden(7), EXPECTED_MOBILE);
+  it('mobile(14 球 = 近 7 + フィールド 7)が記録値と一致する', () => {
+    assertGolden(runGolden(SLOT_COUNT_MOBILE), EXPECTED_MOBILE);
   });
 
   it('2 回実行が同一(同一プロセス内の再現性 — init が完全リセットする)', () => {

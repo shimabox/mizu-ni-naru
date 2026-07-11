@@ -25,12 +25,12 @@ describe('WorldSpec(凍結契約 — master-plan §5 の確定形)', () => {
     expect(BUBBLE_STATE.Dead).toBe(5);
   });
 
-  it('容量定数(裁定 A5、A30 で改訂)', () => {
-    expect(BUBBLE_CAPACITY).toBe(16);
-    expect(ATOM_VIEW_CAPACITY).toBe(512);
-    expect(DROPLET_VIEW_CAPACITY).toBe(1024);
-    expect(SPLASH_VIEW_CAPACITY).toBe(16);
-    expect(RIPPLE_VIEW_CAPACITY).toBe(64);
+  it('容量定数(裁定 A5、A30、A32 で改訂)', () => {
+    expect(BUBBLE_CAPACITY).toBe(64);
+    expect(ATOM_VIEW_CAPACITY).toBe(2048);
+    expect(DROPLET_VIEW_CAPACITY).toBe(4096);
+    expect(SPLASH_VIEW_CAPACITY).toBe(64);
+    expect(RIPPLE_VIEW_CAPACITY).toBe(128);
   });
 
   it('KIND_INDEX = { H:0, O:1, H2:2 }', () => {
@@ -44,8 +44,8 @@ describe('WorldSpec(凍結契約 — master-plan §5 の確定形)', () => {
     expect(STEP_HZ).toBe(60);
     expect(DT).toBe(1 / 60);
     expect(MAX_STEPS_PER_FRAME).toBe(3);
-    expect(SLOT_COUNT_DESKTOP).toBe(12);
-    expect(SLOT_COUNT_MOBILE).toBe(7);
+    expect(SLOT_COUNT_DESKTOP).toBe(40);
+    expect(SLOT_COUNT_MOBILE).toBe(14);
     expect(BUBBLE_CAPACITY).toBeGreaterThanOrEqual(SLOT_COUNT_DESKTOP);
   });
 });

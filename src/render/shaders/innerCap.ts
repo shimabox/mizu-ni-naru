@@ -1,4 +1,3 @@
-import { BUBBLE_CAPACITY } from '../../contract/WorldSpec';
 import { BUBBLE_INSTANCE_VERTEX_PARS_GLSL, MIZU_BLUE_GLSL } from './glass';
 import { BUBBLE_STATE_TRANSFORM_GLSL, WATER_VISUAL_RATIO } from './innerWater';
 import { SKY_CHUNK_GLSL, SKY_UNIFORMS_GLSL } from './sky';
@@ -7,13 +6,23 @@ import { SKY_CHUNK_GLSL, SKY_UNIFORMS_GLSL } from './sky';
 export const RIPPLES_PER_BUBBLE = 6;
 
 /**
- * 球内水面キャップ — ミニ海(design-render §4b)。
+ * InnerRipple uniform を張る球数(裁定 A32 — 「カメラ近傍 12 球のみ」)。
+ * BubbleInstanceBuffers.sync() がカメラ距離で毎フレーム選抜し、
+ * aMisc.x(vSlot)を 0..RIPPLE_NEAR_COUNT-1 のインデックスとして詰め替える
+ * (対象外の遠方球は vSlot=-1 でキャップ波紋ループをスキップ — 微波のみ)。
+ */
+export const RIPPLE_NEAR_COUNT = 12;
+
+/**
+ * 球内水面キャップ — ミニ海(design-render §4b、裁定 A31/A32 で改訂)。
  *
  * 単位円盤グリッドを per-instance で cap 半径にスケール:
  * capR = √(Rv² − wl²)(頂点シェーダ内で導出 — CPU 前処理なし)。
  * 頂点は緩い揺れのみ(Straining は wobble 連動 ×3)。フラグメント法線は
- * InnerRippleView 由来の解析リング波(uniform リングバッファ、球ごと 6 本)。
- * 縁はメニスカス帯(§3)と同じ #007fff 発光で滑らかに接続する。
+ * InnerRippleView 由来の解析リング波(uniform リングバッファ、カメラ近傍
+ * 12 球 × 6 本 — A32)。縁はメニスカス帯(§3)と同じ #007fff 発光で滑らかに
+ * 接続する。本体は体積(innerWater)と同じ濃い青と地続きに見えるよう白い
+ * スペキュラ/空反射を抑制(A31 — 境目で色が跳ねない)。
  */
 export const INNER_CAP_VERTEX_GLSL = /* glsl */ `
 precision highp float;
@@ -65,11 +74,11 @@ precision highp float;
 ${SKY_UNIFORMS_GLSL}
 uniform float uStepF;
 uniform vec3 uSssColor;
-uniform vec4 uInnerRipples[${BUBBLE_CAPACITY * RIPPLES_PER_BUBBLE}];  // [x, z, birthStepF, strength] × 16 球 × 6 本
+uniform vec4 uInnerRipples[${RIPPLE_NEAR_COUNT * RIPPLES_PER_BUBBLE}];  // [x, z, birthStepF, strength] × 近傍 12 球 × 6 本(A32)
 varying vec3 vWorldPos;
 varying vec2 vCapLocal;
 varying float vRadial;
-varying float vSlot;
+varying float vSlot;  // 0..${RIPPLE_NEAR_COUNT - 1} = uInnerRipples インデックス、-1 = 対象外(A32)
 varying float vFill;
 varying float vSeed;
 ${SKY_CHUNK_GLSL}
@@ -77,31 +86,37 @@ ${MIZU_BLUE_GLSL}
 const vec3 MIZU_DEEP = vec3(0.0, 0.030, 0.160);
 
 void main() {
-  // InnerRipple: 解析リング波の法線摂動(§4b — 伝播 0.9 u/s・減衰 1.8/s)
+  // InnerRipple: 解析リング波の法線摂動(§4b — 伝播 0.9 u/s・減衰 1.8/s)。
+  // カメラ近傍 12 球のみ追跡(A32) — 対象外(vSlot<0)は微波のみ
   vec3 n = vec3(0.0, 1.0, 0.0);
-  int base = int(vSlot + 0.5) * 6;
-  for (int k = 0; k < 6; k++) {
-    vec4 rp = uInnerRipples[base + k];
-    vec2 d = vCapLocal - rp.xy;
-    float dist = length(d) + 1e-4;
-    float age = max((uStepF - rp.z) / 60.0, 0.0);
-    float radius = 0.9 * age;
-    float env = exp(-6.0 * abs(dist - radius)) * exp(-1.8 * age) * rp.w;
-    n.xz -= (d / dist) * env * sin(40.0 * (dist - radius)) * 0.6;
+  if (vSlot >= 0.0) {
+    int base = int(vSlot + 0.5) * 6;
+    for (int k = 0; k < 6; k++) {
+      vec4 rp = uInnerRipples[base + k];
+      vec2 d = vCapLocal - rp.xy;
+      float dist = length(d) + 1e-4;
+      float age = max((uStepF - rp.z) / 60.0, 0.0);
+      float radius = 0.9 * age;
+      float env = exp(-6.0 * abs(dist - radius)) * exp(-1.8 * age) * rp.w;
+      n.xz -= (d / dist) * env * sin(40.0 * (dist - radius)) * 0.6;
+    }
+    n = normalize(n);
   }
-  n = normalize(n);
 
-  // ミニ海: 海と同一パレット・#007fff 基調(球の中の水は濃い = Mizu の水)
+  // ミニ海: 体積(innerWater)と同じ #007fff 基調パレットへ揃え、白い
+  // スペキュラ/空反射を抑えて境目で色が跳ねないようにする(A31)
   vec3 viewDir = normalize(vWorldPos - cameraPosition);
   float ndv = max(dot(-viewDir, n), 0.0);
   float fresnel = 0.02 + 0.98 * pow(1.0 - ndv, 5.0);
 
-  vec3 body = mix(MIZU_BLUE * 0.50, MIZU_DEEP, 0.35 + 0.45 * vFill);
-  body += uSssColor * min(length(n.xz) * 1.4, 0.5);   // リング波頭のターコイズ
+  vec3 body = mix(MIZU_BLUE * 0.85, MIZU_DEEP, 0.35 + 0.45 * vFill);
+  body += uSssColor * min(length(n.xz) * 1.4, 0.35);   // リング波頭のターコイズ(控えめ)
 
-  vec3 color = mix(body, sky(reflect(viewDir, n)), fresnel * 0.85);
+  // 空の映り込みは MIZU_BLUE で色相を引き戻してから弱めに混ぜる(白飛び防止)
+  vec3 reflection = mix(sky(reflect(viewDir, n)), MIZU_BLUE, 0.55);
+  vec3 color = mix(body, reflection, fresnel * 0.40);
   vec3 halfDir = normalize(uSunDir - viewDir);
-  color += uSunColor * (1.5 * pow(max(dot(n, halfDir), 0.0), 300.0));
+  color += uSunColor * (0.5 * pow(max(dot(n, halfDir), 0.0), 300.0));
 
   // 縁(92% 以遠)はメニスカス帯(§3)へ滑らかに接続
   color += MIZU_BLUE * smoothstep(0.92, 1.0, vRadial) * 1.1;

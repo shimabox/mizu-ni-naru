@@ -9,6 +9,10 @@
  * 明るい空でも文字を沈ませない。加算ブレンドは白背景で消えるため
  * **通常アルファブレンド**(depthTest on / depthWrite off)。
  * スポーンフェードインとごく控えめな明滅は aux = [spawnStep, seed] 駆動。
+ *
+ * 距離カットオフ(裁定 A32): カメラ距離が uLabelCutoffDist を超える球の
+ * 文字は縮退 quad(scale 0)で描かない — 遠方は判読できないため(draw call
+ * は増やさず頂点シェーダで縮退)。uLabelCutoffFade 幅でフェードしポップを防ぐ。
  */
 export const LABEL_VERTEX_GLSL = /* glsl */ `
 precision highp float;
@@ -20,6 +24,8 @@ uniform float uAlpha;
 uniform float uStepF;
 uniform vec3 uCamRight;
 uniform vec3 uCamUp;
+uniform float uLabelCutoffDist; // カメラ距離カットオフ(A32)
+uniform float uLabelCutoffFade; // フェード帯幅(u)
 varying vec2 vUv;
 varying vec3 vColor;
 varying float vFade;
@@ -40,8 +46,12 @@ void main() {
   // 存在感としては過大なので H2(kindIndex=2)のみ 0.77 倍に補正
   // (1.5 × 0.77 ≈ 1.15 — H の約 1.15 倍の見た目に収める)。
   float kindScale = mix(1.0, 0.77, step(1.5, aColorKind.w));
+  // 距離カットオフ(A32): 遠方球の文字は判読できないので縮退させる
+  float distToCam = length(cameraPosition - center);
+  float distFade = 1.0 - smoothstep(
+    uLabelCutoffDist - uLabelCutoffFade, uLabelCutoffDist, distToCam);
   // 文字そのものが原子の本体 — 旧「球 + ラベル」と同程度の存在感
-  float half_ = 2.0 * r * kindScale * fadeIn;
+  float half_ = 2.0 * r * kindScale * fadeIn * distFade;
   vec3 wp = base + (uCamRight * position.x + uCamUp * position.y) * half_;
 
   // セル選択: アトラスは横 4 セル(セル順 = KIND_INDEX)

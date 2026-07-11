@@ -11,12 +11,17 @@
  *   溶解は供給の 1 割弱に抑える → P_DISSOLVE = 0.05
  * 校正ノブの優先順位(§7.5): ① SPAWN_INTERVAL_STEPS ② VOLUME_GAIN ③ P_DISSOLVE
  *
- * 校正実測(2026-07-11 A30 後、scripts/calibrate.mts — seed 7/42/123/2026 × 900 s):
- *   desktop(12 球): T_fill mean 132.5 s(帯 90–150 ✓)/ 落下間隔 mean 11.8 s
- *                    (A30 帯 11–20 ✓)/ 体積シェア 雫 85.3% : 溶解 14.7%(設計 85:15)
- *   mobile (7 球): T_fill mean 113.2 s ✓ / 落下間隔 mean 17.4 s(帯 15–25 ✓)
- *                    / シェア 86.1 : 13.9
- *   → 全帯 PASS。ノブ変更なし(T_fill は球数に不変 — 落下間隔は球数比で短縮)
+ * 校正実測(2026-07-11 A32 後、scripts/calibrate.mts — seed 7/42/123/2026 × 900 s):
+ *   desktop(40 球 = 近 12 + フィールド 28): T_fill mean 140.2 s(帯 90–150 ✓)/
+ *                    近リング落下間隔 mean 11.9 s(帯 11–20 ✓、シーン全体は
+ *                    参考値 mean 3.7 s — 「数秒に 1 回どこかで球が還る」)/
+ *                    体積シェア 雫 85.0% : 溶解 15.0%(設計 85:15)
+ *   mobile (14 球 = 近 7 + フィールド 7): T_fill mean 113.8 s ✓ /
+ *                    近リング落下間隔 mean 17.5 s(帯 15–25 ✓)/ シェア 86.7 : 13.3
+ *   → 全帯 PASS。ノブ① SPAWN_INTERVAL_STEPS_DESKTOP のみ 40→44 に調整
+ *     (A32 で 40 球化 — 共有 RNG ストリームに外側フィールド 28 球分の消費が
+ *     挟まり、近リングのデフォルト校正(4 seed)が帯下限 11s を僅かに
+ *     割り込んだため。近リングの物理式自体は不変)。mobile は変更なし
  */
 
 /* ── スロット / アンカー(§2.3、A30 で緩い二重リングに改訂)─────── */
@@ -36,6 +41,27 @@ export const INNER_RING_SHARE = 5 / 12;
 /** アンカー高さ帯(A30 で 2.6〜6.0 に拡大 — 奥行きと分離自由度)。上限はカメラフレーミング協定。 */
 export const RING_Y_MIN = 2.6;
 export const RING_Y_MAX = 6.0;
+
+/**
+ * 近リングの総スロット数(A32: SlotRing は不変 — このスロット数分だけ従来の
+ * 緩い二重リングを使う)。desktop 40 = 近 12 + 外側フィールド 28、
+ * mobile 14 = 近 7 + フィールド 7。
+ */
+export const NEAR_RING_COUNT_DESKTOP = 12;
+export const NEAR_RING_COUNT_MOBILE = 7;
+/**
+ * 外側環状フィールド(A32、SlotField)。半径は幾何スパイラル
+ * r(t) = FIELD_RADIUS_MIN·(FIELD_RADIUS_MAX/FIELD_RADIUS_MIN)^t
+ * (t = フィールド内インデックス / フィールド数 ∈ [0,1))— dr/dt ∝ r なので
+ * 等間隔 t に対し外側ほど半径間隔が開く = 密度∝1/r(「外へ薄くなる」)。
+ * 角はひまわり配列の黄金角(均等・非周期分布、リング分割の帳簿不要)。
+ * y 帯・分離マージン・再ロール上限は近リングと共通(RING_Y_MIN/MAX、
+ * SEPARATION_MARGIN、SEPARATION_MAX_TRIES を再利用)。
+ */
+export const FIELD_RADIUS_MIN = 8;
+export const FIELD_RADIUS_MAX = 26;
+export const FIELD_ANGLE_JITTER = 0.35; // rad(黄金角スパイラルは疎なので近リングより広く許容)
+export const FIELD_RADIAL_JITTER = 1.4; // u
 /** 角/半径ジッター(±)。リング間 5.1° 近接ペアでも y 再ロールで解ける疎さ。 */
 export const ANGLE_JITTER = 0.06; // rad
 export const RADIAL_JITTER = 0.25; // u
@@ -106,7 +132,14 @@ export const O_TARGET = 8;
  * mobile は 0.75 倍間隔(2.0 体/s)で周期 ≈121 s → 7 球で落下間隔 ≈17 s
  * (A30 帯 15–25 の中央寄り)に補正。
  */
-export const SPAWN_INTERVAL_STEPS_DESKTOP = 40;
+/**
+ * desktop は A32 校正(§7.5 ノブ①)で 40→44 に微調整: 近リング(12 球)の
+ * 落下間隔がデフォルト校正(seed 7/42/123/2026 × 900s)で 10.9s と帯下限
+ * (11s)をわずかに割ったため(近リングの物理式自体は不変 — 40 球化で共有
+ * RNG ストリームに外側フィールドの消費が挟まり乱数列が変わったことによる
+ * サンプル差)。+10% で T_fill・近リング間隔とも帯中央寄りに戻る。
+ */
+export const SPAWN_INTERVAL_STEPS_DESKTOP = 44;
 export const SPAWN_INTERVAL_STEPS_MOBILE = 30;
 /** スロット位相オフセット: スロット i は globalStep + i·7 で試行(同時ポップ防止、決定的 — §3.6)。 */
 export const SPAWN_SLOT_PHASE_STEPS = 7;

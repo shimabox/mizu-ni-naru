@@ -18,6 +18,7 @@ import {
   type WorldEvents,
   type WorldShared,
 } from './bubble/BubbleWorld';
+import { SlotField } from './bubble/SlotField';
 import {
   type SlotPlacement,
   SlotRing,
@@ -30,6 +31,8 @@ import {
   BOB_PERIOD_S,
   INITIAL_FILL_JITTER,
   INITIAL_FILL_MAX,
+  NEAR_RING_COUNT_DESKTOP,
+  NEAR_RING_COUNT_MOBILE,
   SAG_MAX,
   SPAWN_INTERVAL_STEPS_DESKTOP,
   SPAWN_INTERVAL_STEPS_MOBILE,
@@ -86,7 +89,12 @@ export class MizuNiNaruSim implements SimLike {
   private spawnIntervalSteps = SPAWN_INTERVAL_STEPS_DESKTOP;
   private splashesTotal = 0;
   private readonly packer = new AggregatePacker();
-  private readonly ring: { current: SlotRing | null } = { current: null };
+  /** 近リング(SlotRing、不変)+ 外側環状フィールド(SlotField、A32)。 */
+  private readonly ring: {
+    near: SlotRing | null;
+    field: SlotField | null;
+    nearCount: number;
+  } = { near: null, field: null, nearCount: 0 };
   private shared: WorldShared | null = null;
   /** rollInto の others 引数(自スロットを除いた配置の使い回しバッファ)。 */
   private readonly othersBuf: (SlotPlacement | null)[] = [];
@@ -125,7 +133,15 @@ export class MizuNiNaruSim implements SimLike {
         : SPAWN_INTERVAL_STEPS_DESKTOP;
     this.stepCount = 0;
     this.splashesTotal = 0;
-    this.ring.current = new SlotRing(this.slotCount);
+    // 近リングの総数(A32): pacing に連動(mobile 7 / desktop 12)。debug の
+    // ?slots= で小さい総数を指定された場合はフィールドを空にして丸める
+    const nearTarget =
+      pacing === 'mobile' ? NEAR_RING_COUNT_MOBILE : NEAR_RING_COUNT_DESKTOP;
+    const nearCount = Math.min(nearTarget, this.slotCount);
+    const fieldCount = this.slotCount - nearCount;
+    this.ring.nearCount = nearCount;
+    this.ring.near = new SlotRing(nearCount);
+    this.ring.field = fieldCount > 0 ? new SlotField(fieldCount) : null;
 
     // スロット生成(2 パス: 全オブジェクト確保 → 昇順ロール。
     // RNG 順は init 規約どおり: スロット昇順に配置一式 → 初期 fill ジッター — §7.1)
@@ -310,15 +326,26 @@ export class MizuNiNaruSim implements SimLike {
   /** スロットの(再)ロール。initial のみ起動スタッガーの初期 fill(§2.5)。 */
   private rollSlot(index: number, initial: boolean): void {
     const slot = this.slots[index];
-    const ring = this.ring.current;
-    if (!ring) return;
+    const { near, field, nearCount } = this.ring;
+    if (!near) return;
     for (let j = 0; j < this.slotCount; j++) {
       const other = this.slots[j];
       // init 中は未ロールのスロット(placement.r === 1 の空配置)を除外する
       this.othersBuf[j] =
         j === index || (initial && j > index) ? null : other.placement;
     }
-    ring.rollInto(this.rng, index, this.othersBuf, slot.placement);
+    // 近リング(index < nearCount)は SlotRing、外側フィールドは SlotField(A32)。
+    // others は境界を跨いで全スロットを含む(分離チェックの拡張適用)
+    if (index < nearCount) {
+      near.rollInto(this.rng, index, this.othersBuf, slot.placement);
+    } else if (field) {
+      field.rollInto(
+        this.rng,
+        index - nearCount,
+        this.othersBuf,
+        slot.placement,
+      );
+    }
     let fill = 0;
     if (initial) {
       const n = this.slotCount;

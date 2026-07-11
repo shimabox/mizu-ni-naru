@@ -23,49 +23,59 @@ import {
   INNER_CAP_FRAGMENT_GLSL,
   INNER_CAP_VERTEX_GLSL,
   RIPPLES_PER_BUBBLE,
+  RIPPLE_NEAR_COUNT,
 } from '../shaders/innerCap';
 import {
   INNER_WATER_FRAGMENT_GLSL,
   INNER_WATER_VERTEX_GLSL,
 } from '../shaders/innerWater';
-import type { BubbleInstanceBuffers } from './BubbleInstanceBuffers';
+import type {
+  BubbleBucket,
+  BubbleInstanceBuffers,
+} from './BubbleInstanceBuffers';
 
 /** 「発火していない」を示す誕生 stepF(age が巨大 → 減衰で消滅)。 */
 const RIPPLE_DEAD_BIRTH = -1e6;
 
-/** キャップの単位円盤グリッド(24 リング × 48 セグメント — §4b)。 */
-const CAP_RINGS = 24;
-const CAP_SEGMENTS = 48;
+/** キャップの単位円盤グリッド(近距離: 24 リング × 48 セグメント — §4b)。 */
+const CAP_RINGS_NEAR = 24;
+const CAP_SEGMENTS_NEAR = 48;
+/** 遠距離 LOD(A32): 粗いグリッド(≈1/10 の三角形数)。 */
+const CAP_RINGS_FAR = 8;
+const CAP_SEGMENTS_FAR = 16;
 
-const createCapDiskGeometry = (): BufferGeometry => {
-  const vertexCount = 1 + CAP_RINGS * CAP_SEGMENTS;
+const createCapDiskGeometry = (
+  rings: number,
+  segments: number,
+): BufferGeometry => {
+  const vertexCount = 1 + rings * segments;
   const positions = new Float32Array(vertexCount * 3);
   let p = 3;
-  for (let k = 0; k < CAP_RINGS; k++) {
-    const r = (k + 1) / CAP_RINGS;
-    for (let s = 0; s < CAP_SEGMENTS; s++) {
-      const theta = (2 * Math.PI * s) / CAP_SEGMENTS;
+  for (let k = 0; k < rings; k++) {
+    const r = (k + 1) / rings;
+    for (let s = 0; s < segments; s++) {
+      const theta = (2 * Math.PI * s) / segments;
       positions[p] = r * Math.cos(theta);
       positions[p + 1] = 0;
       positions[p + 2] = r * Math.sin(theta);
       p += 3;
     }
   }
-  const triCount = CAP_SEGMENTS + (CAP_RINGS - 1) * CAP_SEGMENTS * 2;
+  const triCount = segments + (rings - 1) * segments * 2;
   const indices = new Uint16Array(triCount * 3);
   let i = 0;
-  const ringStart = (k: number): number => 1 + k * CAP_SEGMENTS;
-  for (let s = 0; s < CAP_SEGMENTS; s++) {
-    const s1 = (s + 1) % CAP_SEGMENTS;
+  const ringStart = (k: number): number => 1 + k * segments;
+  for (let s = 0; s < segments; s++) {
+    const s1 = (s + 1) % segments;
     indices[i++] = 0;
     indices[i++] = ringStart(0) + s1;
     indices[i++] = ringStart(0) + s;
   }
-  for (let k = 0; k < CAP_RINGS - 1; k++) {
+  for (let k = 0; k < rings - 1; k++) {
     const inner = ringStart(k);
     const outer = ringStart(k + 1);
-    for (let s = 0; s < CAP_SEGMENTS; s++) {
-      const s1 = (s + 1) % CAP_SEGMENTS;
+    for (let s = 0; s < segments; s++) {
+      const s1 = (s + 1) % segments;
       indices[i++] = inner + s;
       indices[i++] = inner + s1;
       indices[i++] = outer + s;
@@ -81,24 +91,28 @@ const createCapDiskGeometry = (): BufferGeometry => {
 };
 
 /**
- * 球内の水(design-render §4)— 体積 1 draw + 水面キャップ 1 draw。
+ * 球内の水(design-render §4、裁定 A32 で距離 LOD 2 バケット化)— 体積 2 draw
+ * (near/far)+ 水面キャップ 2 draw(near/far)。
  *
- * per-instance 属性は BubbleGlassSystem と同一の BubbleInstanceBuffers を共有。
- * InnerRippleView のイベントはレンダー側リングバッファ(球ごと 6 本、
- * 古い順上書き)に保持し、uniform `uInnerRipples[96]`(16 球 × 6 本)で
- * 解析リング波としてキャップの法線に注入する(A7/A8)。
+ * per-instance 属性は BubbleGlassSystem と同一の BubbleInstanceBuffers
+ * (near/far バケット)を共有。InnerRippleView のイベントはレンダー側
+ * リングバッファ(カメラ近傍 RIPPLE_NEAR_COUNT 球 × 6 本、古い順上書き)に
+ * 保持し、uniform `uInnerRipples`で解析リング波としてキャップの法線に
+ * 注入する(A7/A8/A32)。
  */
 export class InnerWaterSystem implements RenderSystem {
   public readonly object: Group;
 
-  private readonly volumeGeometry: InstancedBufferGeometry;
-  private readonly capGeometry: InstancedBufferGeometry;
+  private readonly volumeNearGeometry: InstancedBufferGeometry;
+  private readonly volumeFarGeometry: InstancedBufferGeometry;
+  private readonly capNearGeometry: InstancedBufferGeometry;
+  private readonly capFarGeometry: InstancedBufferGeometry;
   private readonly volumeMaterial: ShaderMaterial;
   private readonly capMaterial: ShaderMaterial;
   private readonly buffers: BubbleInstanceBuffers;
 
   private readonly rippleUniform: Vector4[];
-  private readonly rippleCursor = new Int32Array(BUBBLE_CAPACITY);
+  private readonly rippleCursor = new Int32Array(RIPPLE_NEAR_COUNT);
   private readonly lastState = new Int32Array(BUBBLE_CAPACITY).fill(
     BUBBLE_STATE.Dead,
   );
@@ -111,18 +125,16 @@ export class InnerWaterSystem implements RenderSystem {
     this.buffers = buffers;
 
     this.rippleUniform = [];
-    for (let i = 0; i < BUBBLE_CAPACITY * RIPPLES_PER_BUBBLE; i++) {
+    for (let i = 0; i < RIPPLE_NEAR_COUNT * RIPPLES_PER_BUBBLE; i++) {
       this.rippleUniform.push(new Vector4(0, 0, RIPPLE_DEAD_BIRTH, 0));
     }
 
     const sssColor = new Color(0x2fc0a8);
 
-    const volumeBase = new IcosahedronGeometry(1, 3);
-    this.volumeGeometry = this.makeInstanced(
-      volumeBase.getIndex(),
-      volumeBase.getAttribute('position') as BufferAttribute,
-      buffers,
-    );
+    const volumeNearBase = new IcosahedronGeometry(1, 3); // 近距離ディテール(§4a、不変)
+    const volumeFarBase = new IcosahedronGeometry(1, 1); // 遠距離 LOD(A32)
+    this.volumeNearGeometry = makeInstanced(volumeNearBase, buffers.near);
+    this.volumeFarGeometry = makeInstanced(volumeFarBase, buffers.far);
     this.volumeMaterial = new ShaderMaterial({
       vertexShader: INNER_WATER_VERTEX_GLSL,
       fragmentShader: INNER_WATER_FRAGMENT_GLSL,
@@ -138,12 +150,13 @@ export class InnerWaterSystem implements RenderSystem {
       side: FrontSide,
     });
 
-    const capBase = createCapDiskGeometry();
-    this.capGeometry = this.makeInstanced(
-      capBase.getIndex(),
-      capBase.getAttribute('position') as BufferAttribute,
-      buffers,
+    const capNearBase = createCapDiskGeometry(
+      CAP_RINGS_NEAR,
+      CAP_SEGMENTS_NEAR,
     );
+    const capFarBase = createCapDiskGeometry(CAP_RINGS_FAR, CAP_SEGMENTS_FAR);
+    this.capNearGeometry = makeInstanced(capNearBase, buffers.near);
+    this.capFarGeometry = makeInstanced(capFarBase, buffers.far);
     this.capMaterial = new ShaderMaterial({
       vertexShader: INNER_CAP_VERTEX_GLSL,
       fragmentShader: INNER_CAP_FRAGMENT_GLSL,
@@ -164,11 +177,24 @@ export class InnerWaterSystem implements RenderSystem {
 
     this.object = new Group();
     this.object.matrixAutoUpdate = false;
-    const volumeMesh = new Mesh(this.volumeGeometry, this.volumeMaterial);
-    volumeMesh.renderOrder = 4;
-    const capMesh = new Mesh(this.capGeometry, this.capMaterial);
-    capMesh.renderOrder = 5;
-    for (const mesh of [volumeMesh, capMesh]) {
+    // renderOrder: far バケット(基準値)→ near バケット(+0.5)で遠→近を維持(§1.3)
+    const volumeFarMesh = new Mesh(this.volumeFarGeometry, this.volumeMaterial);
+    volumeFarMesh.renderOrder = 4;
+    const volumeNearMesh = new Mesh(
+      this.volumeNearGeometry,
+      this.volumeMaterial,
+    );
+    volumeNearMesh.renderOrder = 4.5;
+    const capFarMesh = new Mesh(this.capFarGeometry, this.capMaterial);
+    capFarMesh.renderOrder = 5;
+    const capNearMesh = new Mesh(this.capNearGeometry, this.capMaterial);
+    capNearMesh.renderOrder = 5.5;
+    for (const mesh of [
+      volumeFarMesh,
+      volumeNearMesh,
+      capFarMesh,
+      capNearMesh,
+    ]) {
       mesh.frustumCulled = false;
       mesh.matrixAutoUpdate = false;
       this.object.add(mesh);
@@ -176,8 +202,10 @@ export class InnerWaterSystem implements RenderSystem {
   }
 
   public update(view: SkyRenderView, frame: FrameInfo): void {
-    this.volumeGeometry.instanceCount = this.buffers.count;
-    this.capGeometry.instanceCount = this.buffers.count;
+    this.volumeNearGeometry.instanceCount = this.buffers.near.count;
+    this.volumeFarGeometry.instanceCount = this.buffers.far.count;
+    this.capNearGeometry.instanceCount = this.buffers.near.count;
+    this.capFarGeometry.instanceCount = this.buffers.far.count;
 
     this.volumeMaterial.uniforms.uAlpha.value = frame.alpha;
     this.volumeMaterial.uniforms.uTimeSec.value = frame.timeSec;
@@ -189,45 +217,37 @@ export class InnerWaterSystem implements RenderSystem {
   }
 
   public dispose(): void {
-    this.volumeGeometry.dispose();
-    this.capGeometry.dispose();
+    this.volumeNearGeometry.dispose();
+    this.volumeFarGeometry.dispose();
+    this.capNearGeometry.dispose();
+    this.capFarGeometry.dispose();
     this.volumeMaterial.dispose();
     this.capMaterial.dispose();
   }
 
-  private makeInstanced(
-    index: BufferAttribute | null,
-    position: BufferAttribute,
-    buffers: BubbleInstanceBuffers,
-  ): InstancedBufferGeometry {
-    const geometry = new InstancedBufferGeometry();
-    geometry.setIndex(index);
-    geometry.setAttribute('position', position);
-    geometry.setAttribute('aCurrA', buffers.currA);
-    geometry.setAttribute('aCurrB', buffers.currB);
-    geometry.setAttribute('aPrevA', buffers.prevA);
-    geometry.setAttribute('aPrevB', buffers.prevB);
-    geometry.setAttribute('aMisc', buffers.misc);
-    geometry.instanceCount = 0;
-    return geometry;
-  }
-
-  /** InnerRippleView → 球ごとのリングバッファ(古い順上書き)+ 再誕生でクリア。 */
+  /**
+   * InnerRippleView → カメラ近傍 RIPPLE_NEAR_COUNT 球のリングバッファ
+   * (古い順上書き)+ 再誕生でクリア(A32: rippleIndexBySlot 経由の間接参照)。
+   */
   private ingestRipples(view: SkyRenderView): void {
     const bubbles = view.bubbles;
     const count = Math.min(bubbles.count, BUBBLE_CAPACITY);
+    const rippleIndexBySlot = this.buffers.rippleIndexBySlot;
     for (let slot = 0; slot < count; slot++) {
       const state = Math.floor(bubbles.data[slot * 8 + 7]);
       if (
         state === BUBBLE_STATE.Spawning &&
         this.lastState[slot] !== BUBBLE_STATE.Spawning
       ) {
-        // スロット再利用(世代交代)— 前世代の波紋を消す
-        const base = slot * RIPPLES_PER_BUBBLE;
-        for (let k = 0; k < RIPPLES_PER_BUBBLE; k++) {
-          this.rippleUniform[base + k].set(0, 0, RIPPLE_DEAD_BIRTH, 0);
+        // スロット再利用(世代交代)— 前世代の波紋を消す(近傍追跡中のみ)
+        const rIdx = rippleIndexBySlot[slot];
+        if (rIdx >= 0) {
+          const base = rIdx * RIPPLES_PER_BUBBLE;
+          for (let k = 0; k < RIPPLES_PER_BUBBLE; k++) {
+            this.rippleUniform[base + k].set(0, 0, RIPPLE_DEAD_BIRTH, 0);
+          }
+          this.rippleCursor[rIdx] = 0;
         }
-        this.rippleCursor[slot] = 0;
       }
       this.lastState[slot] = state;
     }
@@ -238,14 +258,35 @@ export class InnerWaterSystem implements RenderSystem {
       const o = i * 4;
       const slot = ripples.data[o];
       if (slot < 0 || slot >= BUBBLE_CAPACITY) continue;
-      const cursor = this.rippleCursor[slot];
-      this.rippleUniform[slot * RIPPLES_PER_BUBBLE + cursor].set(
+      const rIdx = rippleIndexBySlot[slot];
+      if (rIdx < 0) continue; // 遠方球(カメラ近傍 12 球の対象外)は微波のみ(A32)
+      const cursor = this.rippleCursor[rIdx];
+      this.rippleUniform[rIdx * RIPPLES_PER_BUBBLE + cursor].set(
         ripples.data[o + 1], // localX(球ローカル世界単位 — A8)
         ripples.data[o + 2], // localZ
         view.step,
         ripples.data[o + 3], // strength
       );
-      this.rippleCursor[slot] = (cursor + 1) % RIPPLES_PER_BUBBLE;
+      this.rippleCursor[rIdx] = (cursor + 1) % RIPPLES_PER_BUBBLE;
     }
   }
 }
+
+const makeInstanced = (
+  base: IcosahedronGeometry | BufferGeometry,
+  bucket: BubbleBucket,
+): InstancedBufferGeometry => {
+  const geometry = new InstancedBufferGeometry();
+  geometry.setIndex(base.getIndex());
+  geometry.setAttribute(
+    'position',
+    base.getAttribute('position') as BufferAttribute,
+  );
+  geometry.setAttribute('aCurrA', bucket.currA);
+  geometry.setAttribute('aCurrB', bucket.currB);
+  geometry.setAttribute('aPrevA', bucket.prevA);
+  geometry.setAttribute('aPrevB', bucket.prevB);
+  geometry.setAttribute('aMisc', bucket.misc);
+  geometry.instanceCount = 0;
+  return geometry;
+};

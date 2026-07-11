@@ -1,6 +1,7 @@
 import {
   AdditiveBlending,
   BackSide,
+  type BufferAttribute,
   FrontSide,
   Group,
   IcosahedronGeometry,
@@ -16,36 +17,36 @@ import {
   GLASS_FRONT_FRAGMENT_GLSL,
   GLASS_VERTEX_GLSL,
 } from '../shaders/glass';
-import type { BubbleInstanceBuffers } from './BubbleInstanceBuffers';
+import type {
+  BubbleBucket,
+  BubbleInstanceBuffers,
+} from './BubbleInstanceBuffers';
 
 /**
- * 球体ガラス(design-render §3)。
+ * 球体ガラス(design-render §3、裁定 A32 で距離 LOD 2 バケット化)。
  *
- * IcosahedronGeometry(1, 4) の instanced 2 draw(backside 加算 →
- * frontside αブレンド)。インスタンス属性は BubbleInstanceBuffers を
- * InnerWaterSystem と共有(アップロード 1 回)。加算優位設計なので
- * 球間ソートにほぼ非感応(前後関係は buffers の遠→近順が担保)。
+ * IcosahedronGeometry の instanced 2 draw(backside 加算 → frontside
+ * αブレンド)を near/far バケットそれぞれに張る(計 4 draw)。近距離は
+ * detail4(現状品質)、遠距離は detail2(A32 — 「遠くはきちんと描画しなくて
+ * いい」)。インスタンス属性は BubbleInstanceBuffers を InnerWaterSystem と
+ * 共有(アップロード 1 回)。加算優位設計なので球間ソートにほぼ非感応
+ * (前後関係は buffers の遠→近順 + renderOrder の far→near 順が担保)。
  */
 export class BubbleGlassSystem implements RenderSystem {
   public readonly object: Group;
 
-  private readonly geometry: InstancedBufferGeometry;
+  private readonly nearGeometry: InstancedBufferGeometry;
+  private readonly farGeometry: InstancedBufferGeometry;
   private readonly backMaterial: ShaderMaterial;
   private readonly frontMaterial: ShaderMaterial;
   private readonly buffers: BubbleInstanceBuffers;
 
   constructor(sun: SunUniforms, buffers: BubbleInstanceBuffers) {
     this.buffers = buffers;
-    const base = new IcosahedronGeometry(1, 4);
-    this.geometry = new InstancedBufferGeometry();
-    this.geometry.setIndex(base.getIndex());
-    this.geometry.setAttribute('position', base.getAttribute('position'));
-    this.geometry.setAttribute('aCurrA', buffers.currA);
-    this.geometry.setAttribute('aCurrB', buffers.currB);
-    this.geometry.setAttribute('aPrevA', buffers.prevA);
-    this.geometry.setAttribute('aPrevB', buffers.prevB);
-    this.geometry.setAttribute('aMisc', buffers.misc);
-    this.geometry.instanceCount = 0;
+    const nearBase = new IcosahedronGeometry(1, 4); // 近距離ディテール(§3、不変)
+    const farBase = new IcosahedronGeometry(1, 2); // 遠距離 LOD(A32)
+    this.nearGeometry = makeInstanced(nearBase, buffers.near);
+    this.farGeometry = makeInstanced(farBase, buffers.far);
 
     const makeMaterial = (fragment: string, back: boolean): ShaderMaterial => {
       const material = new ShaderMaterial({
@@ -71,11 +72,17 @@ export class BubbleGlassSystem implements RenderSystem {
 
     this.object = new Group();
     this.object.matrixAutoUpdate = false;
-    const backMesh = new Mesh(this.geometry, this.backMaterial);
-    backMesh.renderOrder = 6;
-    const frontMesh = new Mesh(this.geometry, this.frontMaterial);
-    frontMesh.renderOrder = 7;
-    for (const mesh of [backMesh, frontMesh]) {
+    // renderOrder: far バケットを先に描く(基準値)→ near バケット(+0.5)。
+    // 全体の遠→近 painter's order を維持する(§1.3)
+    const backFar = new Mesh(this.farGeometry, this.backMaterial);
+    backFar.renderOrder = 6;
+    const backNear = new Mesh(this.nearGeometry, this.backMaterial);
+    backNear.renderOrder = 6.5;
+    const frontFar = new Mesh(this.farGeometry, this.frontMaterial);
+    frontFar.renderOrder = 7;
+    const frontNear = new Mesh(this.nearGeometry, this.frontMaterial);
+    frontNear.renderOrder = 7.5;
+    for (const mesh of [backFar, backNear, frontFar, frontNear]) {
       mesh.frustumCulled = false;
       mesh.matrixAutoUpdate = false;
       this.object.add(mesh);
@@ -84,7 +91,8 @@ export class BubbleGlassSystem implements RenderSystem {
 
   public update(_view: SkyRenderView, frame: FrameInfo): void {
     // 属性は BubbleInstanceBuffers.sync(SceneRenderer が毎フレーム 1 回)済み
-    this.geometry.instanceCount = this.buffers.count;
+    this.nearGeometry.instanceCount = this.buffers.near.count;
+    this.farGeometry.instanceCount = this.buffers.far.count;
     this.backMaterial.uniforms.uAlpha.value = frame.alpha;
     this.backMaterial.uniforms.uTimeSec.value = frame.timeSec;
     this.frontMaterial.uniforms.uAlpha.value = frame.alpha;
@@ -92,8 +100,28 @@ export class BubbleGlassSystem implements RenderSystem {
   }
 
   public dispose(): void {
-    this.geometry.dispose();
+    this.nearGeometry.dispose();
+    this.farGeometry.dispose();
     this.backMaterial.dispose();
     this.frontMaterial.dispose();
   }
 }
+
+const makeInstanced = (
+  base: IcosahedronGeometry,
+  bucket: BubbleBucket,
+): InstancedBufferGeometry => {
+  const geometry = new InstancedBufferGeometry();
+  geometry.setIndex(base.getIndex());
+  geometry.setAttribute(
+    'position',
+    base.getAttribute('position') as BufferAttribute,
+  );
+  geometry.setAttribute('aCurrA', bucket.currA);
+  geometry.setAttribute('aCurrB', bucket.currB);
+  geometry.setAttribute('aPrevA', bucket.prevA);
+  geometry.setAttribute('aPrevB', bucket.prevB);
+  geometry.setAttribute('aMisc', bucket.misc);
+  geometry.instanceCount = 0;
+  return geometry;
+};

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseUrlParams } from '../../src/app/urlParams';
+import { BUBBLE_CAPACITY } from '../../src/contract/WorldSpec';
 
 describe('parseUrlParams', () => {
   it('省略時は既定値(全て undefined / measure=false)', () => {
@@ -39,9 +40,13 @@ describe('parseUrlParams', () => {
     expect(p.slots).toBeUndefined();
   });
 
-  it('slots は 1..BUBBLE_CAPACITY(16)に制限する', () => {
-    expect(parseUrlParams('?slots=16').slots).toBe(16);
-    expect(parseUrlParams('?slots=17').slots).toBeUndefined();
+  it('slots は 1..BUBBLE_CAPACITY に制限する', () => {
+    expect(parseUrlParams(`?slots=${BUBBLE_CAPACITY}`).slots).toBe(
+      BUBBLE_CAPACITY,
+    );
+    expect(
+      parseUrlParams(`?slots=${BUBBLE_CAPACITY + 1}`).slots,
+    ).toBeUndefined();
     expect(parseUrlParams('?slots=1').slots).toBe(1);
   });
 });
