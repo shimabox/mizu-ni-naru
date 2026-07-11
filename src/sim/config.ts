@@ -149,6 +149,16 @@ export const SPAWN_MAX_TRIES = 16;
 export const P_DISSOLVE = 0.05;
 /** 原子/H2 溶解の InnerRipple strength(裁定 A7)。 */
 export const DISSOLVE_RIPPLE_STRENGTH = 0.3;
+/**
+ * 原子が水面で跳ね返る(mirror反射・非溶解)ときの「ポチャ」InnerRipple
+ * strength(裁定 A34)。溶解(0.3)より控えめな微波。
+ */
+export const BOUNCE_RIPPLE_STRENGTH = 0.15;
+/**
+ * 跳ね返りポチャの球ごとのレート制限(裁定 A34): 18 step(0.3s)未満の連続発火は
+ * 抑止する(直近発火 step を球ごとに記録 — 決定的・RNG 消費なし)。
+ */
+export const BOUNCE_RIPPLE_RATE_LIMIT_STEPS = 18;
 /** 原子色: 単一 RNG 値(packed 0xRRGGBB)から導出するチャンネルの下駄(暗すぎる文字を避ける)。 */
 export const ATOM_COLOR_BASE = 0.35;
 export const ATOM_COLOR_SPAN = 0.65;

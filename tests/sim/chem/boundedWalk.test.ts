@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DT } from '../../../src/contract/WorldSpec';
 import { Atom } from '../../../src/sim/chem/Atom';
 import {
+  WATER_INTERACTION,
   interactWater,
   reflectSphere,
   walk,
@@ -108,32 +109,32 @@ describe('BoundedWalk.reflectSphere', () => {
   });
 });
 
-describe('BoundedWalk.interactWater(漏れあり反射 — §3.3)', () => {
-  it('水面に触れていなければ RNG を消費しない', () => {
+describe('BoundedWalk.interactWater(漏れあり反射 — §3.3、裁定 A34 で三値化)', () => {
+  it('水面に触れていなければ RNG を消費しない(None)', () => {
     const rng = new SpyRandom(new Mulberry32(1));
     const atom = makeAtom(0, 0.5, 0);
-    const dissolved = interactWater(atom, -0.5, 1.2, rng);
-    expect(dissolved).toBe(false);
+    const result = interactWater(atom, -0.5, 1.2, rng);
+    expect(result).toBe(WATER_INTERACTION.None);
     expect(rng.calls).toBe(0);
   });
 
-  it('交差時に RNG 1 回で透過判定し、P_DISSOLVE 未満なら溶解を返す', () => {
+  it('交差時に RNG 1 回で透過判定し、P_DISSOLVE 未満なら Dissolved を返す', () => {
     const rng = new SequenceRandom([P_DISSOLVE * 0.5]);
     const atom = makeAtom(0.1, -0.45, 0);
-    const dissolved = interactWater(atom, -0.4, 1.2, rng);
-    expect(dissolved).toBe(true);
+    const result = interactWater(atom, -0.4, 1.2, rng);
+    expect(result).toBe(WATER_INTERACTION.Dissolved);
     expect(rng.calls).toBe(1);
   });
 
-  it('P_DISSOLVE 以上なら水面で mirror-and-negate(y のみ、x/z 保存)', () => {
+  it('P_DISSOLVE 以上なら水面で mirror-and-negate して Bounced を返す(y のみ、x/z 保存)', () => {
     const rng = new SequenceRandom([0.9]);
     const atom = makeAtom(0.1, -0.49, 0.2);
     atom.vx = 0.05;
     atom.vy = -0.3;
     atom.vz = -0.02;
     const waterY = -0.4;
-    const dissolved = interactWater(atom, waterY, 1.2, rng);
-    expect(dissolved).toBe(false);
+    const result = interactWater(atom, waterY, 1.2, rng);
+    expect(result).toBe(WATER_INTERACTION.Bounced);
     expect(atom.y).toBeCloseTo(2 * (waterY + atom.r) - -0.49, 10);
     expect(atom.y - atom.r).toBeGreaterThanOrEqual(waterY);
     expect(atom.vy).toBeCloseTo(0.3, 10);
@@ -143,14 +144,14 @@ describe('BoundedWalk.interactWater(漏れあり反射 — §3.3)', () => {
     expect(atom.z).toBeCloseTo(0.2, 10);
   });
 
-  it('球殻とのくさび部では水平クランプで球内に留める(y は保存)', () => {
+  it('球殻とのくさび部では水平クランプで球内に留める(y は保存、Bounced)', () => {
     const rng = new SequenceRandom([0.9]);
     const rEff = 1.2;
     // 水面が高く、粒子が殻ぎりぎりの横位置にいる状況を合成
     const waterY = 0.3;
     const atom = makeAtom(1.15, 0.3, 0.2);
-    const dissolved = interactWater(atom, waterY, rEff, rng);
-    expect(dissolved).toBe(false);
+    const result = interactWater(atom, waterY, rEff, rng);
+    expect(result).toBe(WATER_INTERACTION.Bounced);
     const d = Math.hypot(atom.x, atom.y, atom.z);
     expect(d).toBeLessThanOrEqual(rEff + 1e-9);
     expect(atom.y - atom.r).toBeGreaterThanOrEqual(waterY - 1e-9);
@@ -163,7 +164,9 @@ describe('BoundedWalk.interactWater(漏れあり反射 — §3.3)', () => {
     for (let i = 0; i < 20000; i++) {
       const atom = makeAtom(0, -0.45, 0);
       crossings++;
-      if (interactWater(atom, -0.4, 1.2, rng)) dissolved++;
+      if (interactWater(atom, -0.4, 1.2, rng) === WATER_INTERACTION.Dissolved) {
+        dissolved++;
+      }
     }
     const p = dissolved / crossings;
     expect(p).toBeGreaterThan(P_DISSOLVE * 0.7);

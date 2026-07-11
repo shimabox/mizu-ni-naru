@@ -74,10 +74,25 @@ export const reflectSphere = (atom: Atom, rEff: number): void => {
 };
 
 /**
+ * 球内水面との相互作用の結果(§3.3 拡張 — 裁定 A34)。
+ * None = 未接触、Dissolved = 溶解(消滅・体積加算・InnerRipple は呼び出し側)、
+ * Bounced = mirror-and-negate 跳ね返り(「ポチャ」InnerRipple の発火・
+ * 球ごとのレート制限は呼び出し側 BubbleWorld が担う — この関数は RNG 消費順を
+ * 変えないため純粋に幾何を返すだけに留める)。
+ */
+export const WATER_INTERACTION = {
+  None: 0,
+  Dissolved: 1,
+  Bounced: 2,
+} as const;
+export type WaterInteraction =
+  (typeof WATER_INTERACTION)[keyof typeof WATER_INTERACTION];
+
+/**
  * 球内水面との相互作用(§3.3 — 漏れあり反射 / 確率透過)。
- * 粒子の下端が水に触れたら、確率 P_DISSOLVE で溶解(true を返す — 消滅・体積
- * 加算・InnerRipple は呼び出し側)、さもなくば水面で mirror-and-negate
- * (y のみ。x/z は保存)。RNG は交差時のみ 1 回(呼び順は粒子更新順に埋め込まれ決定的)。
+ * 粒子の下端が水に触れたら、確率 P_DISSOLVE で溶解(Dissolved を返す)、
+ * さもなくば水面で mirror-and-negate(y のみ。x/z は保存)して Bounced を
+ * 返す。RNG は交差時のみ 1 回(呼び順は粒子更新順に埋め込まれ決定的)。
  *
  * 水面ミラーが球殻とのくさび部で R_eff を僅かに超えうるため、反射後に水平方向
  * (x/z)の位置クランプを 1 回だけ行う(y と速度は保存 — 球面境界と「常に水面より
@@ -89,9 +104,9 @@ export const interactWater = (
   waterY: number,
   rEff: number,
   rng: Random,
-): boolean => {
-  if (atom.y - atom.r >= waterY) return false;
-  if (rng.next() < DISSOLVE_P) return true;
+): WaterInteraction => {
+  if (atom.y - atom.r >= waterY) return WATER_INTERACTION.None;
+  if (rng.next() < DISSOLVE_P) return WATER_INTERACTION.Dissolved;
   atom.y = 2 * (waterY + atom.r) - atom.y;
   atom.vy = -atom.vy;
   const l2 = Math.max(rEff * rEff - atom.y * atom.y, 0);
@@ -101,5 +116,5 @@ export const interactWater = (
     atom.x *= k;
     atom.z *= k;
   }
-  return false;
+  return WATER_INTERACTION.Bounced;
 };

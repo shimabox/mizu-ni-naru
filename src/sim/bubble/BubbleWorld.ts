@@ -1,10 +1,17 @@
 import { KIND_INDEX } from '../../contract/WorldSpec';
 import type { Atom } from '../chem/Atom';
 import type { AtomFactory } from '../chem/AtomFactory';
-import { interactWater, reflectSphere, walk } from '../chem/BoundedWalk';
+import {
+  WATER_INTERACTION,
+  interactWater,
+  reflectSphere,
+  walk,
+} from '../chem/BoundedWalk';
 import type { Spawner } from '../chem/Spawner';
 import {
   ATOM_MAX_SPEED_RATIO,
+  BOUNCE_RIPPLE_RATE_LIMIT_STEPS,
+  BOUNCE_RIPPLE_STRENGTH,
   BURST_SPAWN_INTERVAL_STEPS,
   DISSOLVE_RIPPLE_STRENGTH,
   DROPLET_RADIUS_RATIO_MAX,
@@ -90,6 +97,8 @@ export class BubbleWorld {
     nowStep: number;
   };
   private slotIndex = 0;
+  // 跳ね返り「ポチャ」の球ごとレート制限(裁定 A34 — 決定的・世代跨ぎで reset() が再初期化)
+  private lastBounceRippleStep = -BOUNCE_RIPPLE_RATE_LIMIT_STEPS;
   // 雫吸収シンク(事前束縛 — 定常アロケーションゼロ)
   private readonly absorbSink = {
     onAbsorb: (x: number, z: number, r: number): void => {
@@ -121,6 +130,7 @@ export class BubbleWorld {
     this.atoms.length = 0;
     this.droplets.clear();
     this.water.reset(this.rInner, initialFill01);
+    this.lastBounceRippleStep = -BOUNCE_RIPPLE_RATE_LIMIT_STEPS;
   }
 
   /** Splashing 進入: 「弾けて中身ごと水になる」— 原子・雫を全消去(台帳へ計上)。 */
@@ -183,8 +193,11 @@ export class BubbleWorld {
       if (a.dead) continue;
       walk(a, rng, vMax);
       reflectSphere(a, rInner - a.r);
-      if (interactWater(a, waterY, rInner - a.r, rng)) {
+      const interaction = interactWater(a, waterY, rInner - a.r, rng);
+      if (interaction === WATER_INTERACTION.Dissolved) {
         this.dissolveAtom(a);
+      } else if (interaction === WATER_INTERACTION.Bounced) {
+        this.maybeEmitBounceRipple(a, globalStep);
       }
     }
 
@@ -291,6 +304,22 @@ export class BubbleWorld {
     this.water.addVolume(vol);
     this.volumeFromDissolve += vol;
     this.events?.emitRipple(this.slotIndex, a.x, a.z, DISSOLVE_RIPPLE_STRENGTH);
+  }
+
+  /**
+   * 跳ね返り(§3.3 拡張 — 裁定 A34): 「ポチャ」InnerRipple(strength 0.15)を
+   * 球ごとに BOUNCE_RIPPLE_RATE_LIMIT_STEPS(18 step = 0.3s)未満の連続発火を
+   * 抑止して発火する。判定は globalStep の差分のみ(決定的・RNG 消費なし)。
+   */
+  private maybeEmitBounceRipple(a: Atom, globalStep: number): void {
+    if (
+      globalStep - this.lastBounceRippleStep <
+      BOUNCE_RIPPLE_RATE_LIMIT_STEPS
+    ) {
+      return;
+    }
+    this.lastBounceRippleStep = globalStep;
+    this.events?.emitRipple(this.slotIndex, a.x, a.z, BOUNCE_RIPPLE_STRENGTH);
   }
 
   /**

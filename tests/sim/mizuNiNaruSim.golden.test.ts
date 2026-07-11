@@ -87,6 +87,8 @@ const runGolden = (slotCount: number): GoldenRecord => {
  * 28/7 SlotField)で配置の RNG 消費とスロット数が意図して変わったため
  * (変更管理手順に基づく再記録)。desktop はさらに校正ノブ調整
  * (SPAWN_INTERVAL_STEPS_DESKTOP 40→44、config.ts 参照)で再々記録。
+ * 2026-07-11 再記録(2): A34(水面バウンド「ポチャ」InnerRipple 追加)で
+ * rippleSum のみ増加(RNG 消費順は不変 — 他フィールドは無変更)。
  */
 const EXPECTED_DESKTOP: GoldenRecord = {
   bubbles: 294.92617119963506,
@@ -97,7 +99,7 @@ const EXPECTED_DESKTOP: GoldenRecord = {
   atomCount: 629,
   dropletCount: 20,
   splashSum: 7,
-  rippleSum: 511,
+  rippleSum: 1918,
   h: 329,
   o: 226,
   h2: 74,
@@ -117,7 +119,7 @@ const EXPECTED_MOBILE: GoldenRecord = {
   atomCount: 267,
   dropletCount: 5,
   splashSum: 3,
-  rippleSum: 185,
+  rippleSum: 671,
   h: 132,
   o: 97,
   h2: 38,
