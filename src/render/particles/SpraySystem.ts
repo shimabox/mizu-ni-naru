@@ -27,8 +27,9 @@ import {
   solveLandingTime,
 } from './ballistics';
 
-/** リングバッファ容量(§6 — モバイル縮小は Phase 4)。 */
-export const SPRAY_CAPACITY = 2048;
+/** リングバッファ容量(§6 — モバイル縮小は Phase 4。裁定 A33/A35 でクラウン増量 +
+ * 球体増量に合わせて余裕を確保)。 */
+export const SPRAY_CAPACITY = 4096;
 /** 最大寿命 [step](life ≤ 1.7s — 可視ウィンドウの打ち切りに使用)。 */
 const MAX_LIFE_STEPS = 1.7 * 60 + 10;
 /** 「未スポーン」を示す spawnStepF(age が巨大 → kill)。 */
@@ -178,8 +179,8 @@ export class SpraySystem implements RenderSystem {
           0.25 + rng() * 0.6,
         );
       }
-      // 中央コラム数個(ほぼ真上)
-      for (let i = 0; i < 5; i++) {
+      // 中央コラム数個(ほぼ真上、裁定 A33 でやや増量)
+      for (let i = 0; i < 7; i++) {
         const az = rng() * TWO_PI;
         const v = 2.8 + rng() * 1.6;
         this.emit(

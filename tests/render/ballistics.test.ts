@@ -45,14 +45,14 @@ describe('spray ballistics(§6 — 閉形式弾道)', () => {
     expect(Math.floor(packKindSize(1, -1))).toBe(1);
   });
 
-  it('クラウン 40〜80 / 膜片 20〜40(strength 比例・有界)', () => {
-    expect(crownCount(0)).toBe(40);
-    expect(crownCount(1)).toBe(80);
-    expect(crownCount(2)).toBe(80);
+  it('クラウン 55〜100 / 膜片 20〜40(strength 比例・有界、裁定 A33)', () => {
+    expect(crownCount(0)).toBe(55);
+    expect(crownCount(1)).toBe(100);
+    expect(crownCount(2)).toBe(100);
     expect(membraneCount(0)).toBe(20);
     expect(membraneCount(1)).toBe(40);
-    expect(crownCount(0.5)).toBeGreaterThan(40);
-    expect(crownCount(0.5)).toBeLessThan(80);
+    expect(crownCount(0.5)).toBeGreaterThan(55);
+    expect(crownCount(0.5)).toBeLessThan(100);
   });
 
   it('mulberry32 は決定論・[0,1) 有界', () => {

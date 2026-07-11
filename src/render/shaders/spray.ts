@@ -5,8 +5,9 @@ import { IRID_CHUNK_GLSL } from './glass';
  *
  * - 位置は毎フレームシェーダ内で閉形式評価(アップロードは spawn 時のみ)
  * - 死(寿命超過 / 海面到達 / 未スポーン)= 縮退 quad(ラスタ 0)
- * - 加算・depthWrite off・HDR ≤ 1.8(bloom は最輝点のみ拾う)
- * - kind 0 = 水滴(白 → ターコイズ)/ kind 1 = 膜片(虹彩 tint・大きめ)
+ * - 加算・depthWrite off・HDR ≤ 0.95(裁定 A33: bloom 閾値 1.15 を下回り、
+ *   加算しぶきが「発光する火花」に見えないようにする — bloom には乗らない)
+ * - kind 0 = 水滴(白 → 淡い水色、細かい粒)/ kind 1 = 膜片(虹彩 tint・大きめ)
  */
 
 export const SPRAY_VERTEX_GLSL = /* glsl */ `
@@ -34,7 +35,8 @@ void main() {
   float fade = smoothstep(0.0, 0.08, age) * (1.0 - smoothstep(life * 0.7, life, age));
   float kill = (age < 0.0 || age > life || p.y < -0.05) ? 0.0 : 1.0;
 
-  float size = mix(0.030, 0.14, size01) * (kind > 0.5 ? 1.7 : 1.0);
+  // 裁定 A33: 水滴を細かく(mix 上限を 0.14→0.095 に縮小、「水しぶき」の粒立ち)
+  float size = mix(0.018, 0.095, size01) * (kind > 0.5 ? 1.7 : 1.0);
   vec3 wp = p + (uCamRight * position.x + uCamUp * position.y)
               * (size * fade * kill);
 
@@ -59,15 +61,17 @@ void main() {
   float d = length(vQuad);
   float core = exp(-3.0 * d * d) * (1.0 - smoothstep(0.65, 1.0, d));
 
-  // 水滴: 白 → ターコイズの微グラデ。膜片: 虹彩(ガラス膜の名残)
-  vec3 water = mix(vec3(0.72, 0.90, 0.94), vec3(0.20, 0.72, 0.64),
+  // 裁定 A33: 水滴は白 → 淡い水色の微グラデ(飽和ターコイズを抑え「水しぶき」寄りに)。
+  // 膜片: 虹彩(ガラス膜の名残、不変)
+  vec3 water = mix(vec3(0.90, 0.96, 0.99), vec3(0.55, 0.82, 0.88),
                    fract(vSeed * 3.7) * 0.55);
   vec3 film = irid(vSeed * 2.7 + d * 1.6) * 0.55 + vec3(0.30);
   vec3 tint = mix(water, film, step(0.5, vKind));
 
+  // 太陽色 tint を弱める(裁定 A33: 0.6→0.18)。加算グロー自体は HDR 上限で頭打ち
   vec3 col = tint * core * (0.7 + 1.1 * vFade)
-           + uSunColor * (core * core * 0.6);
-  col = min(col, vec3(1.8));  // HDR 上限規約(bloom フリッカ防止)
+           + uSunColor * (core * core * 0.18);
+  col = min(col, vec3(0.95));  // HDR 上限(bloom 閾値 1.15 未満 — A33)
 
   gl_FragColor = vec4(col * vFade, 1.0);
   #include <tonemapping_fragment>

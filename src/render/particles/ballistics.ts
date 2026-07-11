@@ -47,9 +47,9 @@ export const packKindSize = (kind: 0 | 1, size01: number): number =>
 
 const clamp01 = (x: number): number => Math.min(Math.max(x, 0), 1);
 
-/** クラウンリングの粒子数 40〜80(strength 比例 — §6)。 */
+/** クラウンリングの粒子数 55〜100(strength 比例 — §6、裁定 A33 でやや増量)。 */
 export const crownCount = (strength: number): number =>
-  Math.round(40 + 40 * clamp01(strength));
+  Math.round(55 + 45 * clamp01(strength));
 
 /** 球ポップの膜片数 20〜40(§6)。 */
 export const membraneCount = (strength: number): number =>
