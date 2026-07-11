@@ -61,6 +61,8 @@ export class CameraRig {
   private smoothY = 0;
   private reducedMotion = false;
   private lastTimeSec: number | undefined;
+  /** 縦画面フレーミング(A21 — アスペクト<0.75 で基準距離/高さを詰める)。 */
+  private portraitBlend = 0;
 
   // ── オービットオフセット(自動軌道との差分 — 復帰時に 0 へ減衰)
   private offAz = 0;
@@ -84,7 +86,13 @@ export class CameraRig {
   // ── ドラッグオービット / ピンチズーム(A28)
   private readonly onPointerDown = (event: PointerEvent): void => {
     if (this.pointers.size >= 2) return;
-    this.domElement?.setPointerCapture(event.pointerId);
+    try {
+      this.domElement?.setPointerCapture(event.pointerId);
+    } catch {
+      // 一部のモバイルブラウザ/合成入力ではアクティブポインタ未認識で
+      // NotFoundError を投げることがある(捕捉のみで機能に影響なし —
+      // capture が取れなくてもオービット自体は pointermove で機能する)
+    }
     this.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
     if (this.pointers.size === 2) {
       this.pinchDist = this.currentPinchDist();
@@ -162,13 +170,17 @@ export class CameraRig {
 
     // 基準軌道(周期はすべて非整数比 — 240/97/61/91/53/73 s)。
     // 基準距離 13.2 は外リング 6.5 + R_MAX 1.7 の再フレーミング(A30 — 旧 10.0 を
-    // リング拡大比 ≈8.2/6.2 でスケール)。全球収容は非目標(A21 — 海が主役)
+    // リング拡大比 ≈8.2/6.2 でスケール)。全球収容は非目標(A21 — 海が主役)。
+    // 縦画面(portraitBlend>0)は距離を詰め・注視点をやや低く・高さを抑えて
+    // 「海+数球」が窮屈にならない構図にする(全リング収容は非目標のまま)
+    const pb = this.portraitBlend;
     const azimuth = (TWO_PI * t) / 240;
-    const radius = 13.2 + 1.0 * Math.sin((TWO_PI * t) / 97);
-    const height = 5.4 + 0.7 * Math.sin((TWO_PI * t) / 61 + 1.3);
+    const radius = (13.2 + 1.0 * Math.sin((TWO_PI * t) / 97)) * (1 - 0.42 * pb);
+    const height =
+      (5.4 + 0.7 * Math.sin((TWO_PI * t) / 61 + 1.3)) * (1 - 0.3 * pb);
     this.target.set(
       0.5 * Math.sin((TWO_PI * t) / 91),
-      4.0 + 0.25 * Math.sin((TWO_PI * t) / 53),
+      (4.0 + 0.25 * Math.sin((TWO_PI * t) / 53)) * (1 - 0.35 * pb),
       0.5 * Math.cos((TWO_PI * t) / 73),
     );
 
@@ -190,8 +202,11 @@ export class CameraRig {
     const basePol = Math.acos(Math.min(Math.max(dirY / baseDist, -1), 1));
     const baseAz = Math.atan2(dirX, dirZ);
     const az = baseAz + this.offAz;
+    // 縦画面は基準距離を詰めるため DIST_MIN も比例して下げる(A21 の
+    // portraitBlend スケーリングが下限クランプで打ち消されないように)
+    const distMin = DIST_MIN * (1 - 0.42 * pb);
     const dist = Math.min(
-      Math.max(baseDist * Math.exp(this.offLogDist), DIST_MIN),
+      Math.max(baseDist * Math.exp(this.offLogDist), distMin),
       DIST_MAX,
     );
     this.offLogDist = Math.log(dist / baseDist); // クランプ分の巻き戻し(windup 防止)
@@ -234,6 +249,12 @@ export class CameraRig {
   public setAspect(aspect: number): void {
     this.camera.aspect = aspect;
     this.camera.updateProjectionMatrix();
+    // A21: アスペクト 0.75(閾値)〜0.5(典型スマホ縦持ち)で 0→1 に線形ブレンド。
+    // 全リング収容は非目標 — 「海 + 数球」が気持ちよく入る構図を優先する
+    this.portraitBlend = Math.min(
+      Math.max((0.75 - aspect) / (0.75 - 0.5), 0),
+      1,
+    );
   }
 
   public dispose(): void {
