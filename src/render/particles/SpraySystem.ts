@@ -15,7 +15,7 @@ import {
   SPLASH_VIEW_CAPACITY,
 } from '../../contract/WorldSpec';
 import type { SunUniforms } from '../Environment';
-import type { FrameInfo, RenderSystem } from '../RenderSystem';
+import type { FrameInfo, QualityTier, RenderSystem } from '../RenderSystem';
 import type { SplatScheduler } from '../ocean/SplatScheduler';
 import { SPRAY_FRAGMENT_GLSL, SPRAY_VERTEX_GLSL } from '../shaders/spray';
 import {
@@ -34,6 +34,8 @@ export const SPRAY_CAPACITY = 4096;
 const MAX_LIFE_STEPS = 1.7 * 60 + 10;
 /** 「未スポーン」を示す spawnStepF(age が巨大 → kill)。 */
 const NEVER_SPAWNED = -1e6;
+/** ティア → spray 上限(発生数の予算比率。Phase 4 AdaptiveQuality の追加ノブ)。 */
+const BUDGET_BY_TIER: readonly number[] = [1.0, 1.0, 0.8, 0.6, 0.4];
 
 const TWO_PI = 2 * Math.PI;
 const DEG = Math.PI / 180;
@@ -64,6 +66,7 @@ export class SpraySystem implements RenderSystem {
   private lastViewStep = -1;
   private activeUntilStepF = -1;
   private wroteThisFrame = false;
+  private sprayBudget = 1.0;
 
   constructor(sun: SunUniforms, scheduler: SplatScheduler) {
     this.scheduler = scheduler;
@@ -142,6 +145,10 @@ export class SpraySystem implements RenderSystem {
     this.object.visible = frame.stepF < this.activeUntilStepF;
   }
 
+  public applyTier(tier: QualityTier): void {
+    this.sprayBudget = BUDGET_BY_TIER[tier];
+  }
+
   public dispose(): void {
     this.geometry.dispose();
     this.material.dispose();
@@ -161,8 +168,9 @@ export class SpraySystem implements RenderSystem {
         hashSeed(view.step, ev, Math.round(x * 1024) + Math.round(z * 61)),
       );
 
-      // クラウンリング(上向き 55〜75°、速度 2.2〜4.2 u/s — §6)
-      const count = crownCount(strength);
+      // クラウンリング(上向き 55〜75°、速度 2.2〜4.2 u/s — §6)。
+      // spray 上限ノブ(§9.3 拡張): ティアで発生数を間引く
+      const count = Math.round(crownCount(strength) * this.sprayBudget);
       for (let i = 0; i < count; i++) {
         const az = rng() * TWO_PI;
         const elev = (55 + rng() * 20) * DEG;
@@ -182,7 +190,8 @@ export class SpraySystem implements RenderSystem {
         );
       }
       // 中央コラム数個(ほぼ真上、裁定 A33 でやや増量)
-      for (let i = 0; i < 7; i++) {
+      const columnCount = Math.max(1, Math.round(7 * this.sprayBudget));
+      for (let i = 0; i < columnCount; i++) {
         const az = rng() * TWO_PI;
         const v = 2.8 + rng() * 1.6;
         this.emit(
@@ -233,7 +242,7 @@ export class SpraySystem implements RenderSystem {
         const cz = bubbles.data[o + 2];
         const r = bubbles.data[o + 3];
         const rng = mulberry32(hashSeed(view.step, slot + 16, 977));
-        const n = membraneCount(r / 1.7);
+        const n = Math.round(membraneCount(r / 1.7) * this.sprayBudget);
         for (let i = 0; i < n; i++) {
           // 球面上のランダム点(上半球バイアス)から接線 + 外向き
           const az = rng() * TWO_PI;

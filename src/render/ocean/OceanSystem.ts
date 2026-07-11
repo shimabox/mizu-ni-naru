@@ -23,13 +23,22 @@ const TWO_PI = 2 * Math.PI;
 
 const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
 
-/** ティア → グリッド密度(design-render §9.3)。Phase 2 は tier0 固定起動。 */
+/** ティア → グリッド密度(design-render §9.3)。 */
 const GRID_BY_TIER: readonly (readonly [number, number])[] = [
   [144, 192],
   [144, 192],
   [120, 160],
   [96, 128],
   [72, 96],
+];
+
+/** ティア → analyticReflections on/off(design-render §9.3 — tier3/4 は off)。 */
+const ANALYTIC_REFLECTIONS_BY_TIER: readonly boolean[] = [
+  true,
+  true,
+  true,
+  false,
+  false,
 ];
 
 /**
@@ -42,7 +51,16 @@ const GRID_BY_TIER: readonly (readonly [number, number])[] = [
 export class OceanSystem implements RenderSystem {
   public readonly object: Mesh;
 
-  private readonly material: ShaderMaterial;
+  /**
+   * analyticReflections の 2 変種(§9.3)。#define の有無で needsUpdate
+   * 再コンパイルのヒッチを起こさないよう、両方を構築時に事前コンパイルし
+   * 同一 uniforms オブジェクトを共有する(three の ShaderMaterial は
+   * uniforms を参照代入するのでどちらの material 経由でも同じ値を読む)。
+   * applyTier は object.material の参照を差し替えるだけ。
+   */
+  private readonly materialOn: ShaderMaterial;
+  private readonly materialOff: ShaderMaterial;
+  private readonly sharedUniforms: Record<string, { value: unknown }>;
   private readonly geometryCache = new OceanGeometryCache();
   private readonly waveB: Vector4[];
   private readonly phaseRates: number[];
@@ -75,44 +93,52 @@ export class OceanSystem implements RenderSystem {
       this.bubbleMisc.push(new Vector4(0, 0, 0, 0));
     }
 
-    this.material = new ShaderMaterial({
+    this.sharedUniforms = {
+      uSunDir: sun.uSunDir,
+      uSunColor: sun.uSunColor,
+      uWaveA: { value: waveA },
+      uWaveB: { value: this.waveB },
+      uSwellGain: { value: 1 },
+      uSwellAmpSum: { value: SWELL_AMP_SUM_VERTEX },
+      uTimeSec: { value: 0 },
+      uNoise: { value: noiseTexture },
+      uDeepColor: { value: new Color(0x05253c) },
+      uMidColor: { value: new Color(0x0d4d6e) },
+      uSssColor: { value: new Color(0x2fc0a8) },
+      // A38: #eef7f5 → #e2eef2 — 純白寄りは暗い海上で「光」と誤読される
+      // (A37 のしぶきと同じ裁定をフォームにも適用)
+      uFoamColor: { value: new Color(0xe2eef2) },
+      // リップルフィールド(RippleField と uniform 値オブジェクトを共有 —
+      // prerender のピンポン swap がテクスチャ参照を差し替える)
+      uRipple: ripple.uRipple,
+      uRippleTexelUv: ripple.uRippleTexelUv,
+      uRippleTexelWorld: ripple.uRippleTexelWorld,
+      uRippleHalfExtent: ripple.uRippleHalfExtent,
+      // 解析的球面反射(§2.5)— 補間 + 状態変形済みの球データを毎フレーム供給
+      uBubblePosR: { value: this.bubblePosR },
+      uBubbleMisc: { value: this.bubbleMisc },
+      uBubbleCount: { value: 0 },
+    };
+
+    // ANALYTIC_REFLECTIONS の 2 変種を事前コンパイル(§9.3 — needsUpdate 再
+    // コンパイルのヒッチ回避)。uniforms オブジェクトは同一参照を共有する。
+    this.materialOn = new ShaderMaterial({
       vertexShader: OCEAN_VERTEX_GLSL,
       fragmentShader: OCEAN_FRAGMENT_GLSL,
-      uniforms: {
-        uSunDir: sun.uSunDir,
-        uSunColor: sun.uSunColor,
-        uWaveA: { value: waveA },
-        uWaveB: { value: this.waveB },
-        uSwellGain: { value: 1 },
-        uSwellAmpSum: { value: SWELL_AMP_SUM_VERTEX },
-        uTimeSec: { value: 0 },
-        uNoise: { value: noiseTexture },
-        uDeepColor: { value: new Color(0x05253c) },
-        uMidColor: { value: new Color(0x0d4d6e) },
-        uSssColor: { value: new Color(0x2fc0a8) },
-        // A38: #eef7f5 → #e2eef2 — 純白寄りは暗い海上で「光」と誤読される
-        // (A37 のしぶきと同じ裁定をフォームにも適用)
-        uFoamColor: { value: new Color(0xe2eef2) },
-        // リップルフィールド(RippleField と uniform 値オブジェクトを共有 —
-        // prerender のピンポン swap がテクスチャ参照を差し替える)
-        uRipple: ripple.uRipple,
-        uRippleTexelUv: ripple.uRippleTexelUv,
-        uRippleTexelWorld: ripple.uRippleTexelWorld,
-        uRippleHalfExtent: ripple.uRippleHalfExtent,
-        // 解析的球面反射(§2.5)— 補間 + 状態変形済みの球データを毎フレーム供給
-        uBubblePosR: { value: this.bubblePosR },
-        uBubbleMisc: { value: this.bubbleMisc },
-        uBubbleCount: { value: 0 },
-      },
-      // ANALYTIC_REFLECTIONS のティア変種(off)は Phase 4 で事前コンパイル
-      // し参照切替(needsUpdate 再コンパイルのヒッチ回避 — §9.3)
+      uniforms: this.sharedUniforms,
       defines: { RIPPLE_FIELD: '', ANALYTIC_REFLECTIONS: '' },
+    });
+    this.materialOff = new ShaderMaterial({
+      vertexShader: OCEAN_VERTEX_GLSL,
+      fragmentShader: OCEAN_FRAGMENT_GLSL,
+      uniforms: this.sharedUniforms,
+      defines: { RIPPLE_FIELD: '' },
     });
 
     const [rings, segments] = GRID_BY_TIER[0];
     this.object = new Mesh(
       this.geometryCache.get(rings, segments),
-      this.material,
+      this.materialOn,
     );
     this.object.renderOrder = 2; // 不透明: 原子/雫の後、スカイの前(§1.3)
     this.object.frustumCulled = false;
@@ -121,7 +147,10 @@ export class OceanSystem implements RenderSystem {
 
   public update(view: SkyRenderView, frame: FrameInfo): void {
     const t = frame.timeSec;
-    const uniforms = this.material.uniforms;
+    const uniforms = this.sharedUniforms as unknown as Record<
+      string,
+      { value: number }
+    >;
     uniforms.uTimeSec.value = t;
     // 呼吸: 凪がわずかに満ち引きする(周期 90s)
     uniforms.uSwellGain.value = 1 + 0.15 * Math.sin((TWO_PI * t) / 90);
@@ -214,10 +243,14 @@ export class OceanSystem implements RenderSystem {
   public applyTier(tier: QualityTier): void {
     const [rings, segments] = GRID_BY_TIER[tier];
     this.object.geometry = this.geometryCache.get(rings, segments);
+    this.object.material = ANALYTIC_REFLECTIONS_BY_TIER[tier]
+      ? this.materialOn
+      : this.materialOff;
   }
 
   public dispose(): void {
     this.geometryCache.dispose();
-    this.material.dispose();
+    this.materialOn.dispose();
+    this.materialOff.dispose();
   }
 }

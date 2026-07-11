@@ -7,11 +7,16 @@ import {
 } from 'three';
 import type { SkyRenderView, SkyRenderer } from '../contract/RenderView';
 import { STEP_HZ } from '../contract/WorldSpec';
+import {
+  BLOOM_SCALE_BY_TIER,
+  DPR_CAP_BY_TIER,
+  RENDER_SCALE_BY_TIER,
+} from './AdaptiveQuality';
 import { CameraRig } from './CameraRig';
 import { Environment } from './Environment';
 import { createNoiseTexture } from './NoiseTexture';
 import { PostPipeline } from './PostPipeline';
-import type { FrameInfo, RenderSystem } from './RenderSystem';
+import type { FrameInfo, QualityTier, RenderSystem } from './RenderSystem';
 import { AtomViewAttributes } from './atoms/AtomViewAttributes';
 import { DropletSystem } from './atoms/DropletSystem';
 import { LabelSystem } from './atoms/LabelSystem';
@@ -45,11 +50,15 @@ export class SceneRenderer implements SkyRenderer {
   private readonly scene: Scene;
   private readonly cameraRig: CameraRig;
   private readonly systems: RenderSystem[] = [];
-  private readonly maxPixelRatio: number;
+  /** `?dpr=` の明示上限(指定時はティアの dprCap より優先)。 */
+  private readonly dprOverride: number | undefined;
   private readonly noiseTexture: DataTexture;
   private readonly post: PostPipeline;
   private readonly bubbleBuffers: BubbleInstanceBuffers;
   private readonly atomAttributes: AtomViewAttributes;
+  /** AdaptiveQuality ノブ(Phase 4)。既定は tier0 相当。 */
+  private tierDprCap = DEFAULT_MAX_PIXEL_RATIO;
+  private tierRenderScale = 1;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -66,7 +75,7 @@ export class SceneRenderer implements SkyRenderer {
     this.renderer.toneMappingExposure = 1.06;
     this.renderer.outputColorSpace = SRGBColorSpace;
 
-    this.maxPixelRatio = options?.maxPixelRatio ?? DEFAULT_MAX_PIXEL_RATIO;
+    this.dprOverride = options?.maxPixelRatio;
 
     this.scene = new Scene();
     this.cameraRig = new CameraRig({
@@ -145,11 +154,30 @@ export class SceneRenderer implements SkyRenderer {
   public resize(): void {
     const width = this.canvas.clientWidth || window.innerWidth;
     const height = this.canvas.clientHeight || window.innerHeight;
-    const pixelRatio = Math.min(window.devicePixelRatio, this.maxPixelRatio);
+    const dprCap = this.dprOverride ?? this.tierDprCap;
+    const pixelRatio =
+      Math.min(window.devicePixelRatio, dprCap) * this.tierRenderScale;
     this.renderer.setPixelRatio(pixelRatio);
     this.renderer.setSize(width, height, false);
     this.post.setSize(width, height, pixelRatio);
     this.cameraRig.setAspect(width / height);
+  }
+
+  /**
+   * AdaptiveQuality の適用口(design-render §9.3 — Phase 4)。
+   * renderScale/dprCap/bloomScale はここで一括処理し、他の 6 ノブ
+   * (oceanGridDensity/rippleSimResolution/analyticReflections/labelDensity/
+   * backdropCount/spray 上限)は各 RenderSystem.applyTier に委譲する。
+   * SkyRenderer 契約には無い拡張 API — app 層は SceneRenderer を直接束縛して呼ぶ。
+   */
+  public applyTier(tier: QualityTier): void {
+    this.tierDprCap = DPR_CAP_BY_TIER[tier];
+    this.tierRenderScale = RENDER_SCALE_BY_TIER[tier];
+    this.post.setBloomScale(BLOOM_SCALE_BY_TIER[tier]);
+    for (const system of this.systems) {
+      system.applyTier?.(tier);
+    }
+    this.resize();
   }
 
   public dispose(): void {

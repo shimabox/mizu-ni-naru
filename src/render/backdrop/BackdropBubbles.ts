@@ -9,7 +9,7 @@ import {
 import type { SkyRenderView } from '../../contract/RenderView';
 import { SLOT_COUNT_MOBILE } from '../../contract/WorldSpec';
 import type { SunUniforms } from '../Environment';
-import type { FrameInfo, RenderSystem } from '../RenderSystem';
+import type { FrameInfo, QualityTier, RenderSystem } from '../RenderSystem';
 import {
   BACKDROP_FRAGMENT_GLSL,
   BACKDROP_VERTEX_GLSL,
@@ -18,6 +18,8 @@ import {
 /** 遠景フィールドの個体数(裁定 A41 — 「もっと多くの球体で壮大に」)。 */
 export const BACKDROP_COUNT_DESKTOP = 250;
 export const BACKDROP_COUNT_MOBILE = 100;
+/** ティア → backdropCount 比率(Phase 4 AdaptiveQuality の追加ノブ)。 */
+const COUNT_FRACTION_BY_TIER: readonly number[] = [1.0, 1.0, 0.6, 0.3, 0.15];
 
 /**
  * 遠景の書き割り球体フィールド(design-render 拡張 — 裁定 A41)。
@@ -45,6 +47,7 @@ export class BackdropBubbles implements RenderSystem {
 
   private readonly geometry: InstancedBufferGeometry;
   private readonly material: ShaderMaterial;
+  private countFraction = 1.0;
 
   constructor(sun: SunUniforms) {
     const base = new IcosahedronGeometry(1, 1); // 遠景・小径 — 低ディテールで十分
@@ -86,13 +89,19 @@ export class BackdropBubbles implements RenderSystem {
   public update(view: SkyRenderView, frame: FrameInfo): void {
     // slotCount は契約に無いため MizuNiNaruSim と同じ判定式(bubbles.count ベース)
     // を使う(A32/A40 §7.1 と同型 — mobile ⇔ SLOT_COUNT_MOBILE 以下)
-    const count =
+    const base =
       view.bubbles.count <= SLOT_COUNT_MOBILE
         ? BACKDROP_COUNT_MOBILE
         : BACKDROP_COUNT_DESKTOP;
+    // backdropCount ノブ(Phase 4): ティアで比率を落とす(250→150→75 等)
+    const count = Math.max(0, Math.floor(base * this.countFraction));
     this.geometry.instanceCount = count;
     this.material.uniforms.uCount.value = count;
     this.material.uniforms.uTimeSec.value = frame.timeSec;
+  }
+
+  public applyTier(tier: QualityTier): void {
+    this.countFraction = COUNT_FRACTION_BY_TIER[tier];
   }
 
   public dispose(): void {

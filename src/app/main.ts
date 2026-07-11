@@ -1,8 +1,11 @@
-import type { SimLike, SkyRenderer } from '../contract/RenderView';
+import type { SimLike } from '../contract/RenderView';
 import { SLOT_COUNT_DESKTOP, SLOT_COUNT_MOBILE } from '../contract/WorldSpec';
+import { AdaptiveQuality } from '../render/AdaptiveQuality';
+import type { QualityTier } from '../render/RenderSystem';
 import { SceneRenderer } from '../render/SceneRenderer';
 import { MizuNiNaruSim } from '../sim/MizuNiNaruSim';
 import { StubSim } from '../sim/StubSim';
+import { StatsOverlay } from './StatsOverlay';
 import { accumulate } from './accumulator';
 import { parseUrlParams } from './urlParams';
 
@@ -19,16 +22,18 @@ window.addEventListener('DOMContentLoaded', () => {
   const seed = params.seed ?? Math.floor(Math.random() * 0x100000000);
 
   // モバイル判定は app 層(viewport width < 768 — 裁定 A16)
+  const isMobile = window.innerWidth < 768;
   const slotCount =
-    params.slots ??
-    (window.innerWidth < 768 ? SLOT_COUNT_MOBILE : SLOT_COUNT_DESKTOP);
+    params.slots ?? (isMobile ? SLOT_COUNT_MOBILE : SLOT_COUNT_DESKTOP);
 
   // 既定は実 sim(Phase 1)。`?sim=stub` で StubSim(render 開発用の合成アニメ)
   const sim: SimLike =
     params.sim === 'stub' ? new StubSim() : new MizuNiNaruSim();
   sim.init({ seed, slotCount });
 
-  const renderer: SkyRenderer = new SceneRenderer(canvas, {
+  // SceneRenderer を具象型で束縛(applyTier は SkyRenderer 契約外の拡張 API —
+  // Phase 4 AdaptiveQuality 用。app 層は render 層に直接依存してよい)
+  const renderer = new SceneRenderer(canvas, {
     maxPixelRatio: params.dpr,
     parallax: !params.measure,
   });
@@ -37,6 +42,33 @@ window.addEventListener('DOMContentLoaded', () => {
   // StatsOverlay(Phase 4)が正式な表示契約 — これは読み取り専用の裏口)
   (window as unknown as { __mizuCounts?: unknown }).__mizuCounts = () =>
     sim.counts();
+
+  // 品質ティア制御(裁定 A17/§9.3):
+  // - `?m=1` は tier0 固定(視差無効・カメラ t=0 は SceneRenderer/CameraRig 側)
+  // - `?q=0..4` はティア固定(AdaptiveQuality 自体を生成しない)
+  // - それ以外は EMA ヒステリシス制御(モバイル初期 tier2 — 裁定 A16)
+  let currentTier: QualityTier = 0;
+  let adaptive: AdaptiveQuality | undefined;
+  const setTier = (tier: QualityTier): void => {
+    currentTier = tier;
+    renderer.applyTier(tier);
+  };
+  if (params.measure) {
+    setTier(0);
+  } else if (params.q !== undefined) {
+    setTier(params.q as QualityTier);
+  } else {
+    adaptive = new AdaptiveQuality(isMobile ? 2 : 0, setTier);
+  }
+  // テスト用の裏口(黒フレームプローブ等が手動でティア遷移を発火させる)。
+  // 通常運用では AdaptiveQuality か固定ティアのみが呼ぶ
+  (window as unknown as { __mizuApplyTier?: unknown }).__mizuApplyTier = (
+    tier: QualityTier,
+  ) => setTier(tier);
+  (window as unknown as { __mizuTier?: unknown }).__mizuTier = () =>
+    currentTier;
+
+  const overlay = params.measure ? new StatsOverlay() : undefined;
 
   let remainder = 0;
   let lastTimestamp: number | undefined;
@@ -48,12 +80,18 @@ window.addEventListener('DOMContentLoaded', () => {
       lastTimestamp === undefined ? 1000 / 60 : timestamp - lastTimestamp;
     lastTimestamp = timestamp;
 
+    adaptive?.update(frameDtMs);
+
+    const updateStart = performance.now();
     const acc = accumulate(remainder, frameDtMs);
     remainder = acc.remainder;
     for (let i = 0; i < acc.steps; i++) {
       sim.step();
     }
     renderer.render(sim.view(), acc.alpha);
+    const updateMs = performance.now() - updateStart;
+
+    overlay?.update(frameDtMs, updateMs, sim.counts(), currentTier);
 
     rafId = requestAnimationFrame(loop);
   };

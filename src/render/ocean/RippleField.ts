@@ -24,7 +24,7 @@ import {
   MAX_STEPS_PER_FRAME,
   SPLASH_VIEW_CAPACITY,
 } from '../../contract/WorldSpec';
-import type { FrameInfo, RenderSystem } from '../RenderSystem';
+import type { FrameInfo, QualityTier, RenderSystem } from '../RenderSystem';
 import {
   RIPPLE_FOAM_GAIN,
   RIPPLE_SPLAT_FRAGMENT_GLSL,
@@ -47,6 +47,8 @@ import { SPLAT_OUT_STRIDE, SplatScheduler } from './SplatScheduler';
 export const RIPPLE_HALF_EXTENT = 12;
 /** tier0 の解像度(384² → テクセル 0.0625u)。 */
 export const RIPPLE_RESOLUTION = 384;
+/** ティア → rippleSimResolution(design-render §9.3)。 */
+const RESOLUTION_BY_TIER: readonly number[] = [384, 384, 320, 256, 192];
 /** 1 フレームに描けるスプラット上限(instanced quad 容量)。 */
 const SPLAT_CAPACITY = 64;
 
@@ -98,6 +100,7 @@ export class RippleField implements RenderSystem {
   private pendingSteps = 0;
   private splatCount = 0;
   private lastViewStep = -1;
+  private resolution = RIPPLE_RESOLUTION;
 
   constructor() {
     this.object.matrixAutoUpdate = false;
@@ -266,6 +269,26 @@ export class RippleField implements RenderSystem {
     renderer.setRenderTarget(savedTarget);
     renderer.setClearColor(this.savedClearColor, savedClearAlpha);
     renderer.autoClear = savedAutoClear;
+  }
+
+  /**
+   * rippleSimResolution ノブ(§9.3)。ターゲットを setSize で再生成し波は
+   * リセットする(テクスチャが入れ替わるため未初期化 VRAM を prerender で
+   * ゼロクリアさせる — initialized=false)。シェーダはタップ幅を uTexel /
+   * uRippleTexelUv/World から読むため解像度非依存(再コンパイル不要)。
+   */
+  public applyTier(tier: QualityTier): void {
+    const size = RESOLUTION_BY_TIER[tier];
+    if (size === this.resolution) return;
+    this.resolution = size;
+    for (const target of this.targets) target.setSize(size, size);
+    this.uniforms.uRippleTexelUv.value = 1 / size;
+    this.uniforms.uRippleTexelWorld.value = (2 * RIPPLE_HALF_EXTENT) / size;
+    (this.updateMaterial.uniforms.uTexel.value as [number, number])[0] =
+      1 / size;
+    (this.updateMaterial.uniforms.uTexel.value as [number, number])[1] =
+      1 / size;
+    this.initialized = false;
   }
 
   public dispose(): void {

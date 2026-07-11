@@ -6,7 +6,7 @@ import {
   Vector3,
 } from 'three';
 import type { SkyRenderView } from '../../contract/RenderView';
-import type { FrameInfo, RenderSystem } from '../RenderSystem';
+import type { FrameInfo, QualityTier, RenderSystem } from '../RenderSystem';
 import { LABEL_FRAGMENT_GLSL, LABEL_VERTEX_GLSL } from '../shaders/label';
 import type { AtomViewAttributes } from './AtomViewAttributes';
 import { createLabelAtlasTexture } from './LabelAtlas';
@@ -15,6 +15,8 @@ import { createBillboardQuadGeometry, writeCameraBasis } from './billboard';
 /** 距離カットオフ(裁定 A32)。判読できなくなる距離の視覚調整値(u)。 */
 const LABEL_CUTOFF_DISTANCE = 15;
 const LABEL_CUTOFF_FADE = 4;
+/** ティア → labelDensity(design-render §9.3)。負荷時は文字数そのものを間引く。 */
+const DENSITY_BY_TIER: readonly number[] = [1.0, 1.0, 0.75, 0.5, 0.35];
 
 /**
  * 原子 = 文字(design-render §5 改: 文字が主役)— 1 draw。
@@ -32,6 +34,7 @@ export class LabelSystem implements RenderSystem {
   private readonly atlas: CanvasTexture;
   private readonly attributes: AtomViewAttributes;
   private generation = -1;
+  private labelDensity = 1.0;
 
   constructor(attributes: AtomViewAttributes) {
     this.attributes = attributes;
@@ -69,7 +72,11 @@ export class LabelSystem implements RenderSystem {
 
   public update(_view: SkyRenderView, frame: FrameInfo): void {
     this.syncAttributes();
-    this.geometry.instanceCount = this.attributes.count;
+    // labelDensity(§9.3): 負荷時は末尾から間引く(頻度は毎フレーム一定なので
+    // ちらつかない — 集約パッカーの並びは決定的でフレーム間で安定)
+    this.geometry.instanceCount = Math.floor(
+      this.attributes.count * this.labelDensity,
+    );
     const uniforms = this.material.uniforms;
     uniforms.uAlpha.value = frame.alpha;
     uniforms.uStepF.value = frame.stepF;
@@ -78,6 +85,10 @@ export class LabelSystem implements RenderSystem {
       uniforms.uCamRight.value as Vector3,
       uniforms.uCamUp.value as Vector3,
     );
+  }
+
+  public applyTier(tier: QualityTier): void {
+    this.labelDensity = DENSITY_BY_TIER[tier];
   }
 
   public dispose(): void {
