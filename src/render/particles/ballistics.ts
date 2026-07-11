@@ -54,3 +54,43 @@ export const crownCount = (strength: number): number =>
 /** 球ポップの膜片数 20〜40(§6)。 */
 export const membraneCount = (strength: number): number =>
   Math.round(20 + 20 * clamp01(strength));
+
+/**
+ * A57: しぶきの色を着水した球の水色に完全一致させるための JS 側複製。
+ *
+ * `src/render/shaders/glass.ts` の `WATER_TINT_GLSL`(`waterTint(seed) =
+ * WATER_TINT_MAX * fract(sin(seed*91.345+7.13)*43758.5453)`、
+ * `WATER_TINT_MAX=0.55`)と `mix(MIZU_BLUE, MIZU_LIGHT, waterTint(seed))` を
+ * **同一の計算**として CPU 側に複製する(ソースオブトゥルースは glass.ts —
+ * 定数・式を変更する場合は両方を同期させること)。
+ * `seed` は `bubbleVisualSeed`(BubbleInstanceBuffers.ts、裁定 A22)と同じ値。
+ */
+const WATER_TINT_MAX = 0.55; // glass.ts WATER_TINT_GLSL と一致(A47)
+/** #007fff(linear)— glass.ts MIZU_BLUE_GLSL と一致。 */
+const MIZU_BLUE: readonly [number, number, number] = [0.0, 0.2122, 1.0];
+/** glass.ts WATER_TINT_GLSL の MIZU_LIGHT と一致。 */
+const MIZU_LIGHT: readonly [number, number, number] = [0.58, 0.84, 0.92];
+
+/** GLSL の `fract(sin(x)*43758.5453)` と同一の疑似乱数ハッシュ。 */
+const fractSinHash = (x: number): number => {
+  const s = Math.sin(x) * 43758.5453;
+  return s - Math.floor(s);
+};
+
+/** glass.ts `waterTint(seed)` と同一計算(A44/A47)。 */
+export const waterTint = (seed: number): number =>
+  WATER_TINT_MAX * fractSinHash(seed * 91.345 + 7.13);
+
+/**
+ * `mix(MIZU_BLUE, MIZU_LIGHT, waterTint(seed))` と同一計算の RGB を
+ * `out[0..2]` に書く(割り当てなしのホットパス向け)。
+ */
+export const bubbleWaterColor = (
+  seed: number,
+  out: Float32Array | [number, number, number],
+): void => {
+  const t = waterTint(seed);
+  out[0] = MIZU_BLUE[0] + (MIZU_LIGHT[0] - MIZU_BLUE[0]) * t;
+  out[1] = MIZU_BLUE[1] + (MIZU_LIGHT[1] - MIZU_BLUE[1]) * t;
+  out[2] = MIZU_BLUE[2] + (MIZU_LIGHT[2] - MIZU_BLUE[2]) * t;
+};

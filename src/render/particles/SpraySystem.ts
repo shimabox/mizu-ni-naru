@@ -16,9 +16,11 @@ import {
 } from '../../contract/WorldSpec';
 import type { SunUniforms } from '../Environment';
 import type { FrameInfo, QualityTier, RenderSystem } from '../RenderSystem';
+import { bubbleVisualSeed } from '../bubbles/BubbleInstanceBuffers';
 import type { SplatScheduler } from '../ocean/SplatScheduler';
 import { SPRAY_FRAGMENT_GLSL, SPRAY_VERTEX_GLSL } from '../shaders/spray';
 import {
+  bubbleWaterColor,
   crownCount,
   hashSeed,
   membraneCount,
@@ -45,6 +47,21 @@ const TWO_PI = 2 * Math.PI;
 const DEG = Math.PI / 180;
 
 /**
+ * A57: 着水位置とその瞬間 Splashing 状態の球のアンカー位置(ax, az)の
+ * 突き合わせマージン(u、二乗距離で比較)。同一 step の書き込みなので通常は
+ * ほぼ厳密一致するが、タイミングのズレ等のフォールバック用に余裕を持たせる。
+ */
+const SPLASH_MATCH_DIST = 0.5;
+const SPLASH_MATCH_DIST_SQ = SPLASH_MATCH_DIST * SPLASH_MATCH_DIST;
+
+/**
+ * フォールバック色(球が特定できない場合のデフォルト)。旧 foamTop
+ * (#d4ecf2 系、白 8 : 水色 2 目安 — 裁定 A37)をそのまま踏襲。
+ * 膜片(kind 1、球ポップ)にも常にこの色を渡す(虹彩ロジック自体は不変)。
+ */
+const FALLBACK_TINT: readonly [number, number, number] = [0.831, 0.925, 0.949];
+
+/**
  * スプレー/しぶき(design-render §6)。
  *
  * ステートレス弾道の instanced quad リングバッファ。イベント監視:
@@ -59,9 +76,13 @@ export class SpraySystem implements RenderSystem {
   private readonly material: ShaderMaterial;
   private readonly spawnData = new Float32Array(SPRAY_CAPACITY * 4);
   private readonly velData = new Float32Array(SPRAY_CAPACITY * 4);
+  private readonly tintData = new Float32Array(SPRAY_CAPACITY * 3);
   private readonly spawnAttr: InstancedBufferAttribute;
   private readonly velAttr: InstancedBufferAttribute;
+  private readonly tintAttr: InstancedBufferAttribute;
   private readonly scheduler: SplatScheduler;
+  /** ハッシュ計算のスクラッチ出力(spawn 時のみ使用・割り当てなし)。 */
+  private readonly tintScratch: [number, number, number] = [0, 0, 0];
   private readonly lastState = new Int32Array(BUBBLE_CAPACITY).fill(
     BUBBLE_STATE.Dead,
   );
@@ -94,8 +115,11 @@ export class SpraySystem implements RenderSystem {
     this.spawnAttr.setUsage(DynamicDrawUsage);
     this.velAttr = new InstancedBufferAttribute(this.velData, 4);
     this.velAttr.setUsage(DynamicDrawUsage);
+    this.tintAttr = new InstancedBufferAttribute(this.tintData, 3);
+    this.tintAttr.setUsage(DynamicDrawUsage);
     this.geometry.setAttribute('aSpawn', this.spawnAttr);
     this.geometry.setAttribute('aVel', this.velAttr);
+    this.geometry.setAttribute('aTint', this.tintAttr);
     this.geometry.instanceCount = SPRAY_CAPACITY;
 
     this.material = new ShaderMaterial({
@@ -144,6 +168,9 @@ export class SpraySystem implements RenderSystem {
       this.velAttr.clearUpdateRanges();
       this.velAttr.addUpdateRange(0, SPRAY_CAPACITY * 4);
       this.velAttr.needsUpdate = true;
+      this.tintAttr.clearUpdateRanges();
+      this.tintAttr.addUpdateRange(0, SPRAY_CAPACITY * 3);
+      this.tintAttr.needsUpdate = true;
     }
 
     this.object.visible = frame.stepF < this.activeUntilStepF;
@@ -172,6 +199,11 @@ export class SpraySystem implements RenderSystem {
         hashSeed(view.step, ev, Math.round(x * 1024) + Math.round(z * 61)),
       );
 
+      // A57: 着水位置と同フレームの Splashing 球のアンカー位置を突き合わせ、
+      // その球の水色ハッシュ(glass.ts と同一計算)をしぶきの色として完全採用。
+      // 一致する球が見つからない場合は従来の淡い水色にフォールバック(要件5)。
+      const [tr, tg, tb] = this.resolveSplashTint(view, x, z);
+
       // クラウンリング(上向き 55〜75°、速度 2.2〜4.2 u/s — §6)。
       // spray 上限ノブ(§9.3 拡張): ティアで発生数を間引く
       const count = Math.round(crownCount(strength) * this.sprayBudget);
@@ -191,6 +223,9 @@ export class SpraySystem implements RenderSystem {
           Math.sin(az) * speed * cosE,
           0,
           0.25 + rng() * 0.6,
+          tr,
+          tg,
+          tb,
         );
       }
       // 中央コラム数個(ほぼ真上、裁定 A33 でやや増量)
@@ -208,6 +243,9 @@ export class SpraySystem implements RenderSystem {
           Math.sin(az) * 0.3,
           0,
           0.5 + rng() * 0.5,
+          tr,
+          tg,
+          tb,
         );
       }
       // 落着点へのマイクロスプラット 3 個(弾道は閉形式 — spawn 時に確定)
@@ -228,6 +266,38 @@ export class SpraySystem implements RenderSystem {
         );
       }
     }
+  }
+
+  /**
+   * A57: 着水位置(x, z)に最も近い Splashing 状態の球を探し、その球の水色
+   * (glass.ts WATER_TINT_GLSL と同一計算)を返す。マージン外・候補なしの
+   * 場合は FALLBACK_TINT(従来の淡い水色)を返す。
+   */
+  private resolveSplashTint(
+    view: SkyRenderView,
+    x: number,
+    z: number,
+  ): readonly [number, number, number] {
+    const bubbles = view.bubbles;
+    const count = Math.min(bubbles.count, BUBBLE_CAPACITY);
+    let bestSlot = -1;
+    let bestD2 = SPLASH_MATCH_DIST_SQ;
+    for (let slot = 0; slot < count; slot++) {
+      const o = slot * 8;
+      if (Math.floor(bubbles.data[o + 7]) !== BUBBLE_STATE.Splashing) continue;
+      const dx = bubbles.data[o] - x;
+      const dz = bubbles.data[o + 2] - z;
+      const d2 = dx * dx + dz * dz;
+      if (d2 < bestD2) {
+        bestD2 = d2;
+        bestSlot = slot;
+      }
+    }
+    if (bestSlot < 0) return FALLBACK_TINT;
+    const r = bubbles.data[bestSlot * 8 + 3];
+    const seed = bubbleVisualSeed(bestSlot, r);
+    bubbleWaterColor(seed, this.tintScratch);
+    return this.tintScratch;
   }
 
   /** 球のポップ(Splashing 遷移)→ 膜片バースト(虹彩 tint)。 */
@@ -268,6 +338,11 @@ export class SpraySystem implements RenderSystem {
             nz * out + Math.sin(tAz) * tv,
             1,
             0.4 + rng() * 0.6,
+            // 膜片(kind 1)の虹彩ロジックは不変 — aTint は fragment 側の
+            // film 合成のベース色としてのみ使われ、旧 foamTop と同値
+            FALLBACK_TINT[0],
+            FALLBACK_TINT[1],
+            FALLBACK_TINT[2],
           );
         }
       }
@@ -285,6 +360,9 @@ export class SpraySystem implements RenderSystem {
     vz: number,
     kind: 0 | 1,
     size01: number,
+    tr: number,
+    tg: number,
+    tb: number,
   ): void {
     const o = this.cursor * 4;
     this.spawnData[o] = px;
@@ -295,6 +373,10 @@ export class SpraySystem implements RenderSystem {
     this.velData[o + 1] = vy;
     this.velData[o + 2] = vz;
     this.velData[o + 3] = packKindSize(kind, size01);
+    const t = this.cursor * 3;
+    this.tintData[t] = tr;
+    this.tintData[t + 1] = tg;
+    this.tintData[t + 2] = tb;
     this.cursor = (this.cursor + 1) % SPRAY_CAPACITY;
     this.wroteThisFrame = true;
     this.activeUntilStepF = Math.max(

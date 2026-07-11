@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   SPRAY_G_EFF,
+  bubbleWaterColor,
   crownCount,
   hashSeed,
   membraneCount,
   mulberry32,
   packKindSize,
   solveLandingTime,
+  waterTint,
 } from '../../src/render/particles/ballistics';
 
 describe('spray ballistics(§6 — 閉形式弾道)', () => {
@@ -67,5 +69,40 @@ describe('spray ballistics(§6 — 閉形式弾道)', () => {
     // シードが違えば列も違う
     const c = mulberry32(hashSeed(121, 3, 42));
     expect(c()).not.toBe(mulberry32(hashSeed(120, 3, 42))());
+  });
+
+  describe('waterTint / bubbleWaterColor(裁定 A57 — glass.ts WATER_TINT_GLSL の複製)', () => {
+    it('waterTint は [0, 0.55) に有界・決定論', () => {
+      for (const seed of [0, 0.13, 0.5, 0.777, 0.999]) {
+        const t = waterTint(seed);
+        expect(t).toBeGreaterThanOrEqual(0);
+        expect(t).toBeLessThan(0.55);
+        expect(waterTint(seed)).toBe(t);
+      }
+    });
+
+    it('bubbleWaterColor は mix(MIZU_BLUE, MIZU_LIGHT, waterTint(seed)) と一致', () => {
+      const MIZU_BLUE = [0.0, 0.2122, 1.0];
+      const MIZU_LIGHT = [0.58, 0.84, 0.92];
+      for (const seed of [0, 0.13, 0.5, 0.777, 0.999]) {
+        const t = waterTint(seed);
+        const out: [number, number, number] = [0, 0, 0];
+        bubbleWaterColor(seed, out);
+        for (let k = 0; k < 3; k++) {
+          const expected = MIZU_BLUE[k] + (MIZU_LIGHT[k] - MIZU_BLUE[k]) * t;
+          expect(out[k]).toBeCloseTo(expected, 9);
+        }
+      }
+    });
+
+    it('t=0 では MIZU_BLUE、seed が違えば色も変わる(球ごとの濃淡)', () => {
+      // waterTint(seed)=0 となる seed を探索(fract(sin(x))=0)ではなく、
+      // 濃淡が実際に球ごとに変わることだけを決定論的に確認する
+      const a: [number, number, number] = [0, 0, 0];
+      const b: [number, number, number] = [0, 0, 0];
+      bubbleWaterColor(0.1, a);
+      bubbleWaterColor(0.9, b);
+      expect(a).not.toEqual(b);
+    });
   });
 });
