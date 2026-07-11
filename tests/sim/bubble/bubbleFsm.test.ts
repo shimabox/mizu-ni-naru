@@ -8,7 +8,7 @@ import {
   STRAINING_STEPS,
 } from '../../../src/sim/bubble/BubbleFsm';
 import {
-  F_FULL,
+  F_FULL_MAX,
   RESPAWN_DELAY_MAX_S,
   RESPAWN_DELAY_MIN_S,
   WOBBLE_PULSE,
@@ -42,13 +42,13 @@ describe('BubbleFsm(§2 の状態机上表)', () => {
     expect(fsm.state).toBe(BUBBLE_STATE.Drifting);
   });
 
-  it('Drifting は fill01 ≥ F_FULL で Straining へ(時間ではない)', () => {
+  it('Drifting は fill01 ≥ F_FULL_MAX で Straining へ(時間ではない)', () => {
     const fsm = new BubbleFsm();
     const anchor = { ay: 4 };
     advanceN(fsm, anchor, SPAWNING_STEPS); // → Drifting
-    advanceN(fsm, anchor, 1000, F_FULL - 0.01);
+    advanceN(fsm, anchor, 1000, F_FULL_MAX - 0.01);
     expect(fsm.state).toBe(BUBBLE_STATE.Drifting);
-    advanceN(fsm, anchor, 1, F_FULL);
+    advanceN(fsm, anchor, 1, F_FULL_MAX);
     expect(fsm.state).toBe(BUBBLE_STATE.Straining);
   });
 
@@ -56,8 +56,8 @@ describe('BubbleFsm(§2 の状態机上表)', () => {
     const fsm = new BubbleFsm();
     const anchor = { ay: 4.2 };
     advanceN(fsm, anchor, SPAWNING_STEPS, 0);
-    advanceN(fsm, anchor, 1, F_FULL); // → Straining
-    advanceN(fsm, anchor, STRAINING_STEPS, F_FULL);
+    advanceN(fsm, anchor, 1, F_FULL_MAX); // → Straining
+    advanceN(fsm, anchor, STRAINING_STEPS, F_FULL_MAX);
     expect(fsm.state).toBe(BUBBLE_STATE.Falling);
     expect(fsm.fallY0).toBe(4.2);
   });
@@ -66,11 +66,11 @@ describe('BubbleFsm(§2 の状態机上表)', () => {
     const fsm = new BubbleFsm();
     const anchor = { ay: 4 };
     advanceN(fsm, anchor, SPAWNING_STEPS, 0);
-    advanceN(fsm, anchor, 1, F_FULL); // 遷移フレーム(wobble はまだ 0 — 連続性)
+    advanceN(fsm, anchor, 1, F_FULL_MAX); // 遷移フレーム(wobble はまだ 0 — 連続性)
     expect(fsm.wobble).toBe(0);
-    advanceN(fsm, anchor, 1, F_FULL);
+    advanceN(fsm, anchor, 1, F_FULL_MAX);
     expect(fsm.wobble).toBeCloseTo(1 / STRAINING_STEPS, 5);
-    advanceN(fsm, anchor, STRAINING_STEPS / 2 - 1, F_FULL);
+    advanceN(fsm, anchor, STRAINING_STEPS / 2 - 1, F_FULL_MAX);
     expect(fsm.wobble).toBeCloseTo(0.5, 2);
   });
 
@@ -78,13 +78,13 @@ describe('BubbleFsm(§2 の状態机上表)', () => {
     const fsm = new BubbleFsm();
     const anchor = { ay: 4.0 };
     advanceN(fsm, anchor, SPAWNING_STEPS, 0);
-    advanceN(fsm, anchor, 1 + STRAINING_STEPS, F_FULL); // → Falling
+    advanceN(fsm, anchor, 1 + STRAINING_STEPS, F_FULL_MAX); // → Falling
     expect(fsm.state).toBe(BUBBLE_STATE.Falling);
     let splashed = false;
     let steps = 0;
     const rng = new Mulberry32(2);
     while (!splashed && steps < 600) {
-      const ev = fsm.advance(rng, anchor, F_FULL, R);
+      const ev = fsm.advance(rng, anchor, F_FULL_MAX, R);
       expect(fsm.wobble).toBe(1);
       if ((ev & FSM_EVENT.Splashed) !== 0) splashed = true;
       steps++;
@@ -104,13 +104,13 @@ describe('BubbleFsm(§2 の状態机上表)', () => {
     const anchor = { ay: 4.0 };
     const rng = new SpyRandom(new Mulberry32(3));
     advanceN(fsm, anchor, SPAWNING_STEPS, 0, rng);
-    advanceN(fsm, anchor, 1 + STRAINING_STEPS, F_FULL, rng);
+    advanceN(fsm, anchor, 1 + STRAINING_STEPS, F_FULL_MAX, rng);
     while (fsm.state === BUBBLE_STATE.Falling) {
-      fsm.advance(rng, anchor, F_FULL, R);
+      fsm.advance(rng, anchor, F_FULL_MAX, R);
     }
     const callsBefore = rng.calls;
     expect(callsBefore).toBe(0); // ここまで FSM は RNG を消費しない
-    const ev = advanceN(fsm, anchor, SPLASHING_STEPS, F_FULL, rng);
+    const ev = advanceN(fsm, anchor, SPLASHING_STEPS, F_FULL_MAX, rng);
     expect((ev & FSM_EVENT.EnteredDead) !== 0).toBe(true);
     expect(fsm.state).toBe(BUBBLE_STATE.Dead);
     expect(rng.calls).toBe(1); // Dead 遷移時の遅延ロールのみ(§7.1)
@@ -185,19 +185,19 @@ describe('BubbleFsm(§2 の状態机上表)', () => {
       expect(fsm.statePacked(0, 4, R) - BUBBLE_STATE.Spawning).toBeLessThan(1);
     });
 
-    it('Drifting の progress は fill01 / F_FULL(落下前の「張り」の先取り)', () => {
+    it('Drifting の progress は fill01 / F_FULL_MAX(落下前の「張り」の先取り)', () => {
       const fsm = new BubbleFsm();
       fsm.state = BUBBLE_STATE.Drifting;
       const packed = fsm.statePacked(0.3, 4, R);
       expect(Math.floor(packed)).toBe(BUBBLE_STATE.Drifting);
-      expect(packed - 1).toBeCloseTo(0.3 / F_FULL, 5);
+      expect(packed - 1).toBeCloseTo(0.3 / F_FULL_MAX, 5);
     });
 
     it('Falling の progress は落下距離正規化', () => {
       const fsm = new BubbleFsm();
       fsm.state = BUBBLE_STATE.Falling;
       fsm.fallY0 = 4.0;
-      const packed = fsm.statePacked(F_FULL, 2.7, R); // 半分落ちた
+      const packed = fsm.statePacked(F_FULL_MAX, 2.7, R); // 半分落ちた
       expect(packed - 3).toBeCloseTo((4.0 - 2.7) / (4.0 - R), 5);
     });
   });

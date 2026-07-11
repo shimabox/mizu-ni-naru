@@ -4,9 +4,13 @@
  * 「根拠コメント付き定数集約」)。contract 側と重複する定数(STEP_HZ / DT /
  * SLOT_COUNT / 容量)は contract/WorldSpec.ts が正であり、ここには置かない。
  *
- * ペーシングの逆算チェーン(design-sim §5.7、A30 で 12/7 球に増量):
+ * ペーシングの逆算チェーン(design-sim §5.7、A30 で 12/7 球に増量、
+ * A40 で F_FULL 固定 0.6→球ごとの一様帯 [0.8, 0.95](平均 0.875)に伴い
+ * VOLUME_GAIN を同率スケール):
  *   リズム目標(A30 改訂: 11〜20s/落下, 12球) → T_fill ≈132s ÷ 12 ≈ 11s/落下
- *   T_fill と「ぽつぽつ」感(2s強/粒) → N_DROPS_TARGET ≈55 → VOLUME_GAIN = 15
+ *   T_fill と「ぽつぽつ」感(2s強/粒) → N_DROPS_TARGET ≈55 →
+ *     VOLUME_GAIN = 15(F_FULL=0.6 当時)→ A40 で F̄_FULL=0.875 に伴い 22 に再スケール
+ *     (T_fill ∝ F_FULL / VOLUME_GAIN を保つ比率補正: 15 × 0.875/0.6 ≈ 21.9 → 22)
  *   雫レート 0.45/s → スポナー 1.5 体/s(40 step 間隔)
  *   溶解は供給の 1 割弱に抑える → P_DISSOLVE = 0.05
  * 校正ノブの優先順位(§7.5): ① SPAWN_INTERVAL_STEPS ② VOLUME_GAIN ③ P_DISSOLVE
@@ -22,6 +26,15 @@
  *     (A32 で 40 球化 — 共有 RNG ストリームに外側フィールド 28 球分の消費が
  *     挟まり、近リングのデフォルト校正(4 seed)が帯下限 11s を僅かに
  *     割り込んだため。近リングの物理式自体は不変)。mobile は変更なし
+ *
+ * 校正実測(2026-07-11 A40 最終形 — 帯 [0.8,0.95]・VOLUME_GAIN=22、A35 の
+ * 96/24 球構成、同スクリプト・同 seed 掃引 7/42/123/2026 × 900 s):
+ *   desktop(96 球 = 近 12 + フィールド 84): T_fill mean 130.3 s [101.8, 227.6]
+ *                    (帯 90–150 ✓)/ 近リング落下間隔 mean 11.3 s(帯 11–20 ✓、
+ *                    下限寄りだが PASS)/ 体積シェア 雫 81.8% : 溶解 18.2%
+ *   mobile (24 球 = 近 7 + フィールド 17): T_fill mean 103.1 s [80.5, 142.2] ✓ /
+ *                    近リング落下間隔 mean 15.6 s(帯 15–25 ✓)/ シェア 84.0 : 16.0
+ *   → 全帯 PASS(ノブ調整不要 — F_FULL/VOLUME_GAIN の比率補正のみで帯内に収まった)
  */
 
 /* ── スロット / アンカー(§2.3、A30 で緩い二重リングに改訂)─────── */
@@ -89,8 +102,16 @@ export const R_MIN = 1.1; // u
 export const R_MAX = 1.7; // u
 /** 内殻比 R_inner = 0.94R。シェル見かけ厚 6%(粒子・台帳の境界 — 裁定 A13)。 */
 export const SHELL_RATIO = 0.94;
-/** 落下トリガの fill01(分母 V_inner — 裁定 A12)。「見えている空洞の 6 割」。 */
-export const F_FULL = 0.6;
+/**
+ * 落下トリガの fill01 帯(分母 V_inner — 裁定 A12)。「見えている空洞の
+ * 8〜9.5 割」(A40 改訂: 固定 0.6 → 球ごとの一様帯 [0.8, 0.95] —
+ * 「もっと溜まってから。0.9 でもいいくらい。0.8〜0.9 とかにできる?」との
+ * 初期指示を受けた実装後、最終指示で上限を 0.95 まで拡大)。
+ * 閾値は世代(再ロール)ごとに rollSlot が RNG 1 回で引いて BubbleFsm に
+ * 持たせる — 同じ球でも毎回わずかに違う満水で落ち、周期縮退(§2.5)も弱まる。
+ */
+export const F_FULL_MIN = 0.8;
+export const F_FULL_MAX = 0.95;
 /** Spawning: フェードイン+バースト補充が目標人口 20 体に届く最短(120 step / 6 step 間隔 = 20 回)。 */
 export const SPAWNING_DURATION_S = 2.0;
 export const BURST_SPAWN_INTERVAL_STEPS = 6;
@@ -106,8 +127,14 @@ export const SPLASHING_DURATION_S = 0.8;
 /** Dead: 4〜10 s 一様。±3 s の位相拡散が周期縮退(§2.5)を防ぐ。 */
 export const RESPAWN_DELAY_MIN_S = 4;
 export const RESPAWN_DELAY_MAX_S = 10;
-/** 起動スタッガー: 初期 fill を 0.55 幅で散らし、起動 10〜15 s で初落下・以降 ≈16 s 間隔(§2.5)。 */
-export const INITIAL_FILL_MAX = 0.55;
+/**
+ * 起動スタッガー: 初期 fill を 0.75 幅で散らし、起動 10〜15 s で初落下・以降
+ * ≈16 s 間隔(§2.5)。A40 で F_FULL 0.6→[0.8,0.95] に伴い比例引き上げ。
+ * 上限 0.75 + ジッター 0.03 = 0.78 < F_FULL_MIN 0.8 — 起動直後に
+ * いきなり満水落下する球が出ないことを構造的に保証する(帯上限が 0.95 に
+ * 広がっても F_FULL_MIN は不変のためこの保証は影響を受けない)。
+ */
+export const INITIAL_FILL_MAX = 0.75;
 export const INITIAL_FILL_JITTER = 0.03; // ±
 /** 雫着水の wobble パルス(+0.15、毎 step ×0.97 減衰、上限 1 — §2.2)。 */
 export const WOBBLE_PULSE = 0.15;
@@ -185,11 +212,14 @@ export const DROPLET_RIPPLE_SPAN = 0.4;
 /* ── 水(§4)─────────────────────────────────────────────── */
 
 /**
- * 演出係数(§4.4): 1 雫が見かけの 15 倍の水を運ぶ。
- * = (SHARE_DROPLET 0.85 × F_FULL 0.6 × V_inner) / (N_DROPS_TARGET 55 × V̄_drop)。
+ * 演出係数(§4.4): 1 雫が見かけの 22 倍の水を運ぶ。
+ * = (SHARE_DROPLET 0.85 × F̄_FULL 0.875 × V_inner) / (N_DROPS_TARGET 55 × V̄_drop)。
  * R が両辺で消えるため球サイズに依存しない(§5.4 のスケール不変性)。
+ * A40 改訂: F_FULL 0.6→[0.8,0.95](平均 0.875)を同率スケール
+ * (15 × 0.875/0.6 ≈ 21.9 → 22)で補償し、T_fill(充填にかかる実時間)を保存する
+ * (T_fill ∝ F̄_FULL / VOLUME_GAIN のため比率一定なら不変)。
  */
-export const VOLUME_GAIN = 15;
+export const VOLUME_GAIN = 22;
 /**
  * 球冠 LUT(§4.2): 257 エントリ(1KB)。誤差 ≤5×10⁻⁴(中央)/ 2×10⁻³(端点帯)。
  * 端点は漸近式 u = √(f/3)(対称)へ切替(du/df の √ 特異性対策)。

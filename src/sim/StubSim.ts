@@ -24,9 +24,9 @@ const SPAWNING_STEPS = 120; // 2.0 s
 const STRAINING_STEPS = 90; // 1.5 s
 const SPLASHING_STEPS = 48; // 0.8 s
 const DEAD_STEPS = 240; // 4 s(stub は固定 — 位相分散は初期 fill スタッガーで足りる)
-const F_FULL = 0.6;
-const FILL_PER_STEP = F_FULL / (20 * 60); // Drifting で 0 → 0.6 を約 20 s
-const INITIAL_FILL_MAX = 0.55; // 初期スタッガー(design-sim §2.5)
+const F_FULL = 0.875; // A40: 本 sim の帯 [0.8,0.95] の中央値(stub は固定で足りる)
+const FILL_PER_STEP = F_FULL / (20 * 60); // Drifting で 0 → 0.875 を約 20 s
+const INITIAL_FILL_MAX = 0.75; // 初期スタッガー(design-sim §2.5、A40 追従)
 
 // 二重リングの簡易近似(A30 — 本 sim の SlotRing と違い偶奇で振り分けるだけ)
 const RING_RADIUS_INNER = 3.5;
@@ -556,7 +556,12 @@ export class StubSim implements SimLike {
     const rng = this.rng;
     const r = (0.065 + rng.next() * 0.03) * s.r;
     const rEff = s.rInner - r;
-    const y = rEff * 0.55;
+    // A25(球内水面より上)を構成的に保証: 既定は rEff*0.55 だが、A40 で
+    // fill 帯が [0.8,0.95] へ上がり水面が高い球では既定点が水没しうるため、
+    // 水面 + マージンと球殻上限 0.92·rEff の間へクランプする(evalAtom と同じ考え方)。
+    const yLow = Math.max(s.waterY, -rEff * 0.92) + r + 0.03;
+    const yHigh = rEff * 0.92;
+    const y = Math.min(Math.max(rEff * 0.55, yLow), yHigh);
     const lMax = Math.sqrt(Math.max(rEff * rEff - y * y, 0)) * 0.6;
     const angle = rng.next() * 2 * Math.PI;
     const rho = lMax * Math.sqrt(rng.next());

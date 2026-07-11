@@ -2,7 +2,7 @@ import { BUBBLE_STATE, DT, STEP_HZ } from '../../contract/WorldSpec';
 import {
   FALL_DRAG_K,
   FALL_G,
-  F_FULL,
+  F_FULL_MAX,
   RESPAWN_DELAY_MAX_S,
   RESPAWN_DELAY_MIN_S,
   SPAWNING_DURATION_S,
@@ -36,7 +36,7 @@ export interface FsmAnchor {
 /**
  * 球体 FSM(design-sim §2.1–2.2、状態名は裁定 A3)。
  *
- *             2.0s            fill01 ≥ F_FULL          1.5s
+ *             2.0s          fill01 ≥ fullThreshold      1.5s
  *  Spawning ───────▶ Drifting ────────────▶ Straining ───────▶ Falling
  *     ▲                                                           │ ay ≤ R
  *     │ 4〜10s(一様)                                            ▼
@@ -59,6 +59,12 @@ export class BubbleFsm {
   /** 直近の着水速度(SplashEvent の strength 導出用)。 */
   public impactV = 0;
   public deadDurationSteps = 1;
+  /**
+   * この世代の落下トリガ fill01(A40: 世代ごとに [F_FULL_MIN, F_FULL_MAX] の
+   * 一様乱数 — rollSlot が設定)。既定は上限(単体テスト等、未設定でも
+   * fill01 = F_FULL_MAX を与えれば必ず遷移する)。
+   */
+  public fullThreshold: number = F_FULL_MAX;
 
   /** スロット(再)ロール時に呼ぶ。 */
   public enterSpawning(): void {
@@ -103,7 +109,7 @@ export class BubbleFsm {
       }
       case BUBBLE_STATE.Drifting: {
         this.wobble = Math.min(this.wobblePulse, 1);
-        if (fill01 >= F_FULL) {
+        if (fill01 >= this.fullThreshold) {
           this.transition(BUBBLE_STATE.Straining);
         }
         break;
@@ -161,7 +167,7 @@ export class BubbleFsm {
   /**
    * statePacked = stateIndex + min(progress01, 0.999)(§1.3)。
    * progress の意味: Spawning/Straining/Splashing = 経過/持続、
-   * Drifting = fill01/F_FULL、Falling = 落下距離正規化、Dead = 再生成待ち進捗。
+   * Drifting = fill01/fullThreshold、Falling = 落下距離正規化、Dead = 再生成待ち進捗。
    */
   public statePacked(fill01: number, anchorY: number, bubbleR: number): number {
     let progress: number;
@@ -170,7 +176,7 @@ export class BubbleFsm {
         progress = this.stateStep / SPAWNING_STEPS;
         break;
       case BUBBLE_STATE.Drifting:
-        progress = fill01 / F_FULL;
+        progress = fill01 / this.fullThreshold;
         break;
       case BUBBLE_STATE.Straining:
         progress = this.stateStep / STRAINING_STEPS;

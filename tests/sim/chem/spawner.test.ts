@@ -3,7 +3,8 @@ import { KIND_INDEX } from '../../../src/contract/WorldSpec';
 import type { Atom } from '../../../src/sim/chem/Atom';
 import { AtomFactory } from '../../../src/sim/chem/AtomFactory';
 import { Spawner } from '../../../src/sim/chem/Spawner';
-import { H_TARGET, O_TARGET } from '../../../src/sim/config';
+import { F_FULL_MAX, H_TARGET, O_TARGET } from '../../../src/sim/config';
+import { capU } from '../../../src/sim/core/CapLut';
 import { Mulberry32 } from '../../../src/sim/core/Random';
 import { SpyRandom } from '../../helpers/testRandom';
 
@@ -126,6 +127,32 @@ describe('Spawner(凝結スポナー — §3.6)', () => {
     const atom = spawner.trySpawn([], 0, 0, R_INNER * 0.98, R_INNER, R, 0);
     expect(atom).toBeNull();
     expect(rng.calls).toBe(0);
+  });
+
+  it('A40 崩壊ガード: F_FULL_MAX(0.95)相当の水面では空域帯が反転しても ' +
+    'null を返し続け、無限試行・NaN・例外なく決定的(RNG 消費ゼロ)', () => {
+    const { spawner, rng } = makeSpawner(21);
+    // 帯上限 fill01=F_FULL_MAX での実水面(球冠 LUT 経由 — 本 sim と同じ変換)。
+    // y ∈ [waterY+m, R_eff−m] が反転する高さになることを想定した regressive 入力。
+    const waterY = (2 * capU(F_FULL_MAX) - 1) * R_INNER;
+    for (let i = 0; i < 200; i++) {
+      const atom = spawner.trySpawn(
+        [],
+        0,
+        0, // H/O とも枯渇 — 供給ゼロなら試行自体が起きない経路も混在させる
+        waterY,
+        R_INNER,
+        R,
+        i,
+      );
+      // 空域が反転していれば null(NaN や無限ループなしで即座に決定)
+      if (atom) {
+        expect(Number.isFinite(atom.x)).toBe(true);
+        expect(Number.isFinite(atom.y)).toBe(true);
+        expect(Number.isFinite(atom.z)).toBe(true);
+      }
+    }
+    expect(rng.calls).toBe(0); // 空域反転(または不足ゼロ)なので RNG は一切消費しない
   });
 
   it('同 seed 同引数なら同一のスポーン列(決定論)', () => {

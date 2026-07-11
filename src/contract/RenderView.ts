@@ -18,7 +18,7 @@
  * - **原子・雫は常に球内水面より上**(A25 — render の depth 戦略が依存する文書化不変条件)
  * - statePacked の prev は lerp 禁止(状態境界で整数部が跳ぶ — curr のみ読む)
  * - fill01 の分母は V_inner(内殻球 R_inner = 0.94R の体積 — A12)。
- *   F_FULL=0.6 は「見えている空洞の 6 割」
+ *   落下トリガは球ごとの一様帯 [0.8, 0.9](A40)= 「見えている空洞の 8〜9 割」
  */
 export interface BubbleView {
   /** stride 8: [ax, ay, az, R, waterLevelYLocal, fill01, wobble, statePacked] */

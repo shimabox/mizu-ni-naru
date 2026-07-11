@@ -29,6 +29,8 @@ import { Spawner } from './chem/Spawner';
 import {
   BOB_AMP,
   BOB_PERIOD_S,
+  F_FULL_MAX,
+  F_FULL_MIN,
   INITIAL_FILL_JITTER,
   INITIAL_FILL_MAX,
   NEAR_RING_COUNT_DESKTOP,
@@ -359,6 +361,10 @@ export class MizuNiNaruSim implements SimLike {
     slot.r = slot.placement.r;
     slot.world.reset(slot.placement.r, fill);
     slot.fsm.enterSpawning();
+    // A40: この世代の落下トリガを [F_FULL_MIN, F_FULL_MAX] からロール
+    // (RNG 1 回 — 同じ球でも毎回わずかに違う満水で落ちる)
+    slot.fsm.fullThreshold =
+      F_FULL_MIN + this.rng.next() * (F_FULL_MAX - F_FULL_MIN);
     slot.justRespawned = true;
     this.applyBob(slot); // 現在時刻の bob を適用(スポーンフレームの連続性)
     slot.prevAx = slot.ax;

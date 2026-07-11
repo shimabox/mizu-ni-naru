@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { BUBBLE_STATE, SLOT_COUNT_DESKTOP } from '../../src/contract/WorldSpec';
 import type { MassLedger } from '../../src/sim/MizuNiNaruSim';
 import { MizuNiNaruSim } from '../../src/sim/MizuNiNaruSim';
-import { F_FULL, SHELL_RATIO } from '../../src/sim/config';
+import { F_FULL_MAX, SHELL_RATIO } from '../../src/sim/config';
 
 // 主系列は slotCount=12(境界・台帳ロジックの網羅性は球数に依存しない — サイトが
 // 増えるだけ)。96 球スモーク 1 本のみ重い(§7.3 方針)。負荷環境での既定 5s を
@@ -352,7 +352,7 @@ describe('MizuNiNaruSim — プロパティ不変条件(§7.3)', () => {
     expect(c.o / active).toBeLessThanOrEqual(9);
   });
 
-  it('Drifting 中の fill01 は F_FULL 到達後 Straining へ(それ以上 Drifting しない)', () => {
+  it('Drifting 中の fill01 は F_FULL_MAX 到達後 Straining へ(それ以上 Drifting しない)', () => {
     const sim = new MizuNiNaruSim();
     sim.init({ seed: 6, slotCount: 12 });
     for (let s = 0; s < 60 * 150; s++) {
@@ -363,10 +363,64 @@ describe('MizuNiNaruSim — プロパティ不変条件(§7.3)', () => {
         const state = Math.floor(v.bubbles.data[bo + 7]);
         if (state === BUBBLE_STATE.Drifting) {
           // 1 step 分の余裕(到達フレームの遷移は次 step 判定)
-          expect(v.bubbles.data[bo + 5]).toBeLessThan(F_FULL + 0.05);
+          expect(v.bubbles.data[bo + 5]).toBeLessThan(F_FULL_MAX + 0.05);
         }
       }
     }
+  });
+
+  it('A40 高 fill スモーク: 帯上限付近(fill01 > 0.9、崩壊した空域帯を持つ' +
+    'スポナー呼び出しを経由)まで到達しても NaN・破綻なし(seed 1..2 × 240 s)', () => {
+    // 高頻度ループでは expect を毎 step 呼ばず、非有限値を検出したら
+    // 即座に記録して 1 回だけ assert する(§7.3 方針 — 630k 回の expect は遅すぎる)
+    let sawHighFill = false;
+    let nonFinite: string | null = null;
+    for (const seed of [1, 2]) {
+      const sim = new MizuNiNaruSim();
+      sim.init({ seed, slotCount: 12 });
+      for (let s = 0; s < 60 * 240 && !nonFinite; s++) {
+        sim.step();
+        const v = sim.view();
+        for (let b = 0; b < 12; b++) {
+          const bo = b * 8;
+          const fill = v.bubbles.data[bo + 5];
+          if (!Number.isFinite(fill)) {
+            nonFinite = `bubble fill seed=${seed} step=${s} b=${b}`;
+            break;
+          }
+          if (fill > 0.9) sawHighFill = true;
+        }
+        for (let i = 0; i < v.atoms.count && !nonFinite; i++) {
+          const o = i * 4;
+          if (
+            !Number.isFinite(v.atoms.posr[o]) ||
+            !Number.isFinite(v.atoms.posr[o + 1]) ||
+            !Number.isFinite(v.atoms.posr[o + 2])
+          ) {
+            nonFinite = `atom seed=${seed} step=${s} i=${i}`;
+          }
+        }
+        for (let i = 0; i < v.droplets.count && !nonFinite; i++) {
+          const o = i * 4;
+          if (
+            !Number.isFinite(v.droplets.posr[o]) ||
+            !Number.isFinite(v.droplets.posr[o + 1]) ||
+            !Number.isFinite(v.droplets.posr[o + 2])
+          ) {
+            nonFinite = `droplet seed=${seed} step=${s} i=${i}`;
+          }
+        }
+      }
+      const c = sim.counts();
+      if (!Number.isFinite(c.h) || !Number.isFinite(c.o)) {
+        nonFinite = `counts seed=${seed}`;
+      }
+    }
+    expect(nonFinite).toBeNull();
+    // 帯 [0.8, 0.95] を張ればどこかの seed で 0.9 超えが必ず観測される
+    // (F_FULL_MAX=0.95 に十分近い個体が出る)— スポナーの崩壊ガード経路が
+    // 実運用でも踏まれることを保証する
+    expect(sawHighFill).toBe(true);
   });
 
   it('96 球スモーク: A35 構成(近 12 + フィールド 84)でも境界・台帳が壊れない(seed 1 × 300 step)', () => {
