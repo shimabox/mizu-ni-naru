@@ -84,7 +84,7 @@ uniform float uSwellAmpSum;
 uniform vec3 uDeepColor;   // #05253c(linear)
 uniform vec3 uMidColor;    // #0d4d6e
 uniform vec3 uSssColor;    // #2fc0a8 ターコイズ
-uniform vec3 uFoamColor;   // #eef7f5
+uniform vec3 uFoamColor;   // #e2eef2(A38 — 純白は「光」と誤読されるため淡水色)
 
 #ifdef ANALYTIC_REFLECTIONS
 // 配列は BUBBLE_CAPACITY(16)だが、詰められるのはカメラ近傍 ≤8 球(A30)
@@ -181,10 +181,12 @@ void main() {
 
   // 2) フォーム量(§2.4 — 2 系統: ヤコビアン波頭 + 着水フォームリング)
   //    凪の海なので波頭フォームは稀 — スウェルが重なった瞬間だけ筋状に湧く
+  //    裁定 A38: 着水フォームの寄与 1.05→0.9 + 被覆上限 0.85 — 泡は水を
+  //    覆う「物」であり、面が完全な白ペンキになる状態を作らない
   float crestFoam = smoothstep(0.30, 0.65, 1.0 - jac);
-  float foamRaw = clamp(foamE * 1.05 + crestFoam * 0.5, 0.0, 1.0);
+  float foamRaw = clamp(foamE * 0.9 + crestFoam * 0.5, 0.0, 1.0);
   float breakup = texture2D(uNoise, vWorldPos.xz * 1.7 + vec2(uTimeSec * 0.01)).g;
-  float foam = foamRaw * smoothstep(0.25, 0.82, breakup + foamRaw * 0.45);
+  float foam = min(foamRaw * smoothstep(0.25, 0.82, breakup + foamRaw * 0.45), 0.85);
 
   // 3) フレネル(Schlick、水の F0 = 0.02。フォームは粗面 → 反射抑制)
   float fresnel = (0.02 + 0.98 * pow(1.0 - facing, 5.0)) * (1.0 - 0.85 * foam);
@@ -215,13 +217,17 @@ void main() {
   color = mix(color, MIZU_BLUE, 0.05 * clamp(mizuTint, 0.0, 1.0));
 
   // 7) 太陽スペキュラ(タイト)+ マイクロ glitter(ジッタ法線の超高指数ローブ)
+  //    裁定 A38: かき混ぜられた水は泡立つ拡散面 — フレネル(§2.3)と同じく
+  //    フォームで HDR グリントを減衰(泡の上で鏡面反射は物理的に起きない)。
+  //    凪の海(foam≈0)のきらめきは不変
+  float gloss = 1.0 - 0.85 * foam;
   vec3 halfDir = normalize(uSunDir - viewDir);
-  color += uSunColor * (4.0 * pow(max(dot(n, halfDir), 0.0), 600.0));
+  color += uSunColor * (4.0 * pow(max(dot(n, halfDir), 0.0), 600.0)) * gloss;
   vec2 guv = vWorldPos.xz * 6.5 + vec2(0.13, -0.11) * uTimeSec;
   vec3 jitter = texture2D(uNoise, guv).rgb * 2.0 - 1.0;
   vec3 gn = normalize(n + jitter * 0.16);
   float glint = pow(max(dot(gn, halfDir), 0.0), 1400.0);
-  color += uSunColor * min(glint * 3.5, 3.5) * exp(-dist * 0.02);
+  color += uSunColor * min(glint * 3.5, 3.5) * exp(-dist * 0.02) * gloss;
 
   // 8) フォーム合成(§2.4)— 反射より後、フォグより前。太陽高度でライト
   vec3 foamLit = uFoamColor * mix(0.55, 1.0, max(uSunDir.y, 0.0) * 0.8 + 0.2);

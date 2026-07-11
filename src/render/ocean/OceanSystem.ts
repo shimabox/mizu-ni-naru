@@ -90,7 +90,9 @@ export class OceanSystem implements RenderSystem {
         uDeepColor: { value: new Color(0x05253c) },
         uMidColor: { value: new Color(0x0d4d6e) },
         uSssColor: { value: new Color(0x2fc0a8) },
-        uFoamColor: { value: new Color(0xeef7f5) },
+        // A38: #eef7f5 → #e2eef2 — 純白寄りは暗い海上で「光」と誤読される
+        // (A37 のしぶきと同じ裁定をフォームにも適用)
+        uFoamColor: { value: new Color(0xe2eef2) },
         // リップルフィールド(RippleField と uniform 値オブジェクトを共有 —
         // prerender のピンポン swap がテクスチャ参照を差し替える)
         uRipple: ripple.uRipple,

@@ -12,8 +12,12 @@
 
 /** 速度チャネルへの押し下げゲイン(高さクランプ ±0.28u が上限を守る)。 */
 export const RIPPLE_SPLAT_GAIN = 0.26;
-/** フォームリング注入ゲイン(フォームクランプ 1.5)。 */
-export const RIPPLE_FOAM_GAIN = 0.8;
+/**
+ * フォームリング注入ゲイン(フォームクランプ 1.0)。
+ * 裁定 A38: 0.8 → 0.55 — リングが出現フレームから飽和白(=閃光と誤読)に
+ * ならず、「泡が湧いて広がる」強度で始まるように。
+ */
+export const RIPPLE_FOAM_GAIN = 0.55;
 /** Mizu tint 注入ゲイン。 */
 export const RIPPLE_TINT_GAIN = 0.85;
 
