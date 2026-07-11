@@ -15,6 +15,7 @@ import type { FrameInfo, RenderSystem } from './RenderSystem';
 import { AtomViewAttributes } from './atoms/AtomViewAttributes';
 import { DropletSystem } from './atoms/DropletSystem';
 import { LabelSystem } from './atoms/LabelSystem';
+import { BackdropBubbles } from './backdrop/BackdropBubbles';
 import { BubbleGlassSystem } from './bubbles/BubbleGlassSystem';
 import { BubbleInstanceBuffers } from './bubbles/BubbleInstanceBuffers';
 import { InnerWaterSystem } from './bubbles/InnerWaterSystem';
@@ -76,6 +77,9 @@ export class SceneRenderer implements SkyRenderer {
 
     const environment = new Environment(this.noiseTexture);
     this.addSystem(environment);
+    // 遠景の書き割り球体フィールド(A41)— sim 非依存の render 専用装飾。
+    // スカイの直後・近景の半透明群(InnerWater/Glass)の前に敷く(renderOrder 3.5)
+    this.addSystem(new BackdropBubbles(environment.sunUniforms));
     // リップルフィールドは FBO 専用(prerender で完結 — A27: bloom 連鎖・
     // 画面パスからは読まれない)。ocean が uniform 値オブジェクトを共有する
     const rippleField = new RippleField();
