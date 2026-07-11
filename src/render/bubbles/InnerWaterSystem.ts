@@ -40,9 +40,13 @@ const RIPPLE_DEAD_BIRTH = -1e6;
 /** キャップの単位円盤グリッド(近距離: 24 リング × 48 セグメント — §4b)。 */
 const CAP_RINGS_NEAR = 24;
 const CAP_SEGMENTS_NEAR = 48;
-/** 遠距離 LOD(A32): 粗いグリッド(≈1/10 の三角形数)。 */
-const CAP_RINGS_FAR = 8;
-const CAP_SEGMENTS_FAR = 16;
+/**
+ * 遠距離 LOD(A32、A54 で引き上げ)。8×16 は水面キャップの円弧が多角形に
+ * 見えるほど粗く、ガラス(detail2 相当)との滑らかさの差が目立っていた。
+ * 16×32 に倍増しガラスと同程度の見た目粒度に揃える。
+ */
+const CAP_RINGS_FAR = 16;
+const CAP_SEGMENTS_FAR = 32;
 
 const createCapDiskGeometry = (
   rings: number,
@@ -133,8 +137,12 @@ export class InnerWaterSystem implements RenderSystem {
 
     const sssColor = new Color(0x2fc0a8);
 
-    const volumeNearBase = new IcosahedronGeometry(1, 3); // 近距離ディテール(§4a、不変)
-    const volumeFarBase = new IcosahedronGeometry(1, 1); // 遠距離 LOD(A32)
+    // A54: 「まだ多角形に見える — 中の水が多角形では?」(ユーザー指摘・仮説的中)。
+    // A51 はガラスと書き割りのみ引き上げ、水の体積ジオメトリを直し忘れていた。
+    // A48 で水がほぼ不透明になり水のシルエットが球体知覚を支配するため、
+    // ガラス(near detail4 / far detail2)と同レベルまで引き上げてカクつきを解消する。
+    const volumeNearBase = new IcosahedronGeometry(1, 4); // 近距離ディテール(A54 — ガラス近距離と同一detail4に統一)
+    const volumeFarBase = new IcosahedronGeometry(1, 3); // 遠距離 LOD(A54 — detail1→detail3 に引き上げ、シルエットをガラスに揃える)
     this.volumeNearGeometry = makeInstanced(volumeNearBase, buffers.near);
     this.volumeFarGeometry = makeInstanced(volumeFarBase, buffers.far);
     this.volumeMaterial = new ShaderMaterial({
