@@ -5,9 +5,10 @@ import { IRID_CHUNK_GLSL } from './glass';
  *
  * - 位置は毎フレームシェーダ内で閉形式評価(アップロードは spawn 時のみ)
  * - 死(寿命超過 / 海面到達 / 未スポーン)= 縮退 quad(ラスタ 0)
- * - 加算・depthWrite off・HDR ≤ 0.95(裁定 A33: bloom 閾値 1.15 を下回り、
- *   加算しぶきが「発光する火花」に見えないようにする — bloom には乗らない)
- * - kind 0 = 水滴(白 → 淡い水色、細かい粒)/ kind 1 = 膜片(虹彩 tint・大きめ)
+ * - 裁定 A36: **加算ブレンドを廃止**し通常アルファブレンド。暗い海を背景にしても
+ *   「光を足す発光体」に見えないよう、フォーム白の拡散光沢のみで描く(HDR なし・
+ *   色は ≤1.0)。ソフト円スプライトで中心不透明→縁フェード(粒の重なりを溶かす)
+ * - kind 0 = 水滴(フォーム白、細かい粒)/ kind 1 = 膜片(虹彩 tint 弱め・大きめ)
  */
 
 export const SPRAY_VERTEX_GLSL = /* glsl */ `
@@ -59,21 +60,27 @@ ${IRID_CHUNK_GLSL}
 
 void main() {
   float d = length(vQuad);
-  float core = exp(-3.0 * d * d) * (1.0 - smoothstep(0.65, 1.0, d));
+  // ソフト円スプライト: 中心不透明 → 縁へフェード(短命・小粒のためソートなし
+  // でも重なりが破綻しないよう、縁を広めに溶かす — 裁定 A36)
+  float core = exp(-2.2 * d * d);
+  float coverage = 1.0 - smoothstep(0.35, 1.0, d);
 
-  // 裁定 A33: 水滴は白 → 淡い水色の微グラデ(飽和ターコイズを抑え「水しぶき」寄りに)。
-  // 膜片: 虹彩(ガラス膜の名残、不変)
-  vec3 water = mix(vec3(0.90, 0.96, 0.99), vec3(0.55, 0.82, 0.88),
-                   fract(vSeed * 3.7) * 0.55);
-  vec3 film = irid(vSeed * 2.7 + d * 1.6) * 0.55 + vec3(0.30);
+  // フォーム白(#eef7f5 系)。下面をわずかに青灰にして立体感を出す(裁定 A36)。
+  vec3 foamTop = vec3(0.933, 0.969, 0.961);
+  vec3 foamUnder = vec3(0.58, 0.66, 0.70);
+  float underMix = smoothstep(0.15, -0.6, vQuad.y) * 0.5;
+  vec3 water = mix(foamTop, foamUnder, underMix);
+
+  // 膜片(kind 1): 虹彩を弱く残す(ガラス膜の名残)。HDR なし。
+  vec3 film = mix(foamTop, irid(vSeed * 2.7 + d * 1.6) * 0.4 + vec3(0.5), 0.6);
   vec3 tint = mix(water, film, step(0.5, vKind));
 
-  // 太陽色 tint を弱める(裁定 A33: 0.6→0.18)。加算グロー自体は HDR 上限で頭打ち
-  vec3 col = tint * core * (0.7 + 1.1 * vFade)
-           + uSunColor * (core * core * 0.18);
-  col = min(col, vec3(0.95));  // HDR 上限(bloom 閾値 1.15 未満 — A33)
+  // 拡散光沢のみ(発光ではなく反射)。太陽 tint は最小限のハイライトに留める。
+  vec3 col = tint * (0.55 + 0.45 * core) + uSunColor * (core * core * 0.05);
+  col = min(col, vec3(1.0));  // HDR なし(A36: 加算グロー自体を廃止)
 
-  gl_FragColor = vec4(col * vFade, 1.0);
+  float alpha = coverage * core * vFade;
+  gl_FragColor = vec4(col, alpha);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }

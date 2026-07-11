@@ -1,10 +1,10 @@
 import {
-  AdditiveBlending,
   BufferAttribute,
   DynamicDrawUsage,
   InstancedBufferAttribute,
   InstancedBufferGeometry,
   Mesh,
+  NormalBlending,
   ShaderMaterial,
   Vector3,
 } from 'three';
@@ -100,7 +100,9 @@ export class SpraySystem implements RenderSystem {
         uCamRight: { value: new Vector3(1, 0, 0) },
         uCamUp: { value: new Vector3(0, 1, 0) },
       },
-      blending: AdditiveBlending,
+      // 裁定 A36: 加算 → 通常アルファブレンド(暗い海を背景にしても「発光体」に
+      // 見えず、フォームの粒が物として散る)
+      blending: NormalBlending,
       transparent: true,
       depthTest: true,
       depthWrite: false,

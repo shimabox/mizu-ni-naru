@@ -129,7 +129,8 @@ void main() {
   color += MIZU_BLUE * smoothstep(wl + 0.02, wl - 0.25, yl) * 0.05; // 水没部のうっすら青
 
   // Splashing のポップ: フレネル閃光(指数減衰)+ α フェード
-  float flash = (vState == 4.0) ? 6.0 * exp(-vProg * 5.0) : 0.0;
+  // 裁定 A36: しぶきと同時に光る bloom バーストの主犯だったため 6.0→2.0 に減衰
+  float flash = (vState == 4.0) ? 2.0 * exp(-vProg * 5.0) : 0.0;
   color *= 1.0 + flash * fresnel;
   float alpha = (0.06 + fresnel * 0.30) * ((vState == 4.0) ? 1.0 - vProg : 1.0);
 
