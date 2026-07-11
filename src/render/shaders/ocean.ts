@@ -50,7 +50,10 @@ vec2 rippleUv(vec2 xz) {
 // 弱い惑星曲率(球面の局所近似 y ≈ -r²/2R)を先に適用し、Gerstner/リップルは
 // その上に乗せる。K は「r=600(最外周)で沈み ≈4u」水準 — 気づかれるかどうかの
 // ギリギリのラインに留める(§0 Look の「控えめさ」が要件そのもの)。
-const OCEAN_CURVATURE_K = 1.1e-5;
+// A55 follow-up(2026-07-12): ユーザーフィードバック「少し弱いかもな」を受け
+// 約2.5倍に強化(r=600 で沈み ≈10u)。まだ「言われれば気づく」水準は保つが、
+// 静止画でも地平線のわずかな丸みが視認できる程度まで一段引き上げる。
+const OCEAN_CURVATURE_K = 2.75e-5;
 
 export const OCEAN_VERTEX_GLSL = /* glsl */ `
 precision highp float;
