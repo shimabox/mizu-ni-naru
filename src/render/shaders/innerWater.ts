@@ -1,4 +1,8 @@
-import { BUBBLE_INSTANCE_VERTEX_PARS_GLSL, MIZU_BLUE_GLSL } from './glass';
+import {
+  BUBBLE_INSTANCE_VERTEX_PARS_GLSL,
+  MIZU_BLUE_GLSL,
+  WATER_TINT_GLSL,
+} from './glass';
 
 /**
  * 球内の水 — 体積パス(design-render §4a)。
@@ -39,6 +43,7 @@ varying vec3 vLocalPos;
 varying float vR;
 varying float vWaterPlaneY;
 varying float vFill;
+varying float vSeed;
 
 void main() {
   vec3 center = mix(aPrevA.xyz, aCurrA.xyz, uAlpha);
@@ -60,6 +65,7 @@ void main() {
   vR = Rv;
   vWaterPlaneY = center.y + wl * tf.x * tf.z;
   vFill = fill;
+  vSeed = aMisc.y;
   gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
 }
 `;
@@ -75,7 +81,9 @@ varying vec3 vLocalPos;
 varying float vR;
 varying float vWaterPlaneY;
 varying float vFill;
+varying float vSeed;
 ${MIZU_BLUE_GLSL}
+${WATER_TINT_GLSL}
 const vec3 MIZU_DEEP = vec3(0.0, 0.030, 0.160);
 
 void main() {
@@ -89,13 +97,18 @@ void main() {
   float tPlane = (rd.y > 0.0) ? (vWaterPlaneY - vWorldPos.y) / rd.y : 1e9;
   float len = clamp(min(tExit, tPlane), 0.0, 2.0 * vR);
 
+  // A44: 球ごとの水色ハッシュ(0=現在色/最濃端、1=淡い透明水色)。吸収係数を
+  // 弱め・基調色を淡いアクアへ・α 上限も下げる方向でキャップ/メニスカスと追従
+  float tint = waterTint(vSeed);
+
   // A39: 「色が濃い」— 吸収を弱め(1.9/0.75/0.35 → 1.2/0.5/0.24)、深色への
   // 沈み込みを 0.6 倍に、透過も上げて向こうの景色がうっすら通る薄い水色に
-  vec3 absorb = exp(-len / max(vR, 1e-5) * vec3(1.2, 0.5, 0.24)); // 青が生き残る
-  vec3 color = mix(MIZU_BLUE * 0.95, MIZU_DEEP, (1.0 - absorb.b) * 0.6)
+  vec3 absorb = exp(-len / max(vR, 1e-5) * vec3(1.2, 0.5, 0.24) * (1.0 - 0.45 * tint)); // 青が生き残る
+  vec3 baseColor = mix(MIZU_BLUE * 0.95, MIZU_LIGHT, tint * 0.7);
+  vec3 color = mix(baseColor, MIZU_DEEP, (1.0 - absorb.b) * 0.6)
              + uSssColor * 0.10 *
                texture2D(uNoise, vLocalPos.xz * 2.0 + uTimeSec * 0.05).r;
-  float alpha = clamp(0.42 + 0.38 * (1.0 - absorb.b), 0.0, 0.8);
+  float alpha = clamp(0.42 + 0.38 * (1.0 - absorb.b), 0.0, 0.8) * mix(1.0, 0.75, tint);
   alpha *= smoothstep(0.0, 0.03, vFill); // 空球の極小レンズを消す
 
   gl_FragColor = vec4(color, alpha);

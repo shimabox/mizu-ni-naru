@@ -17,6 +17,20 @@ export const MIZU_BLUE_GLSL = /* glsl */ `
 const vec3 MIZU_BLUE = vec3(0.0, 0.2122, 1.0);
 `;
 
+/**
+ * A44: 球ごとの水色ハッシュ — per-generation seed(aMisc.y、A22 方式:
+ * slot+R から導出)からもう一段独立ハッシュして tint 係数 t∈[0,1] を得る。
+ * t=0 が現在色(最濃端)、t=1 が薄く透明な水色。体積(innerWater)・
+ * キャップ(innerCap)・メニスカス(本ファイル)が同じ関数で追従し
+ * 「その球の水」として一貫させる。
+ */
+export const WATER_TINT_GLSL = /* glsl */ `
+float waterTint(float seed) {
+  return fract(sin(seed * 91.345 + 7.13) * 43758.5453);
+}
+const vec3 MIZU_LIGHT = vec3(0.58, 0.84, 0.92);
+`;
+
 /** cos パレットの虹彩(§3 — パステルに抑制して使う)。 */
 export const IRID_CHUNK_GLSL = /* glsl */ `
 vec3 irid(float x) {
@@ -105,12 +119,14 @@ varying float vSeed;
 ${SKY_CHUNK_GLSL}
 ${IRID_CHUNK_GLSL}
 ${MIZU_BLUE_GLSL}
+${WATER_TINT_GLSL}
 
 void main() {
   vec3 nWorld = normalize(vNormalW);
   vec3 viewDir = normalize(vWorldPos - cameraPosition);
   float ndv = abs(dot(nWorld, -viewDir));
   float fresnel = 0.04 + 0.96 * pow(1.0 - ndv, 3.0);
+  vec3 waterColor = mix(MIZU_BLUE, MIZU_LIGHT, waterTint(vSeed)); // A44
 
   // 薄膜干渉の虹彩: 視角 + シード + 微時間で位相が回る(パステル)
   vec3 filmTint = irid(pow(1.0 - ndv, 1.4) * 2.2 + vSeed * 0.61 + uTimeSec * 0.015);
@@ -124,11 +140,12 @@ void main() {
   vec3 halfDir = normalize(uSunDir - viewDir);
   color += uSunColor * (1.6 * pow(max(dot(nWorld, halfDir), 0.0), 240.0));
 
-  // メニスカス: 内水面と接する円周の発光帯(交円上は全て y = wl)
+  // メニスカス: 内水面と接する円周の発光帯(交円上は全て y = wl)。
+  // A44: 体積・キャップと同じ tint 係数で追従(「その球の水」として一貫)
   float yl = vLocalPos.y;
   float wl = vWaterLevel;
-  color += MIZU_BLUE * exp(-pow((yl - wl) / 0.05, 2.0)) * (0.6 + 0.8 * vFill) * 1.4;
-  color += MIZU_BLUE * smoothstep(wl + 0.02, wl - 0.25, yl) * 0.05; // 水没部のうっすら青
+  color += waterColor * exp(-pow((yl - wl) / 0.05, 2.0)) * (0.6 + 0.8 * vFill) * 1.4;
+  color += waterColor * smoothstep(wl + 0.02, wl - 0.25, yl) * 0.05; // 水没部のうっすら青
 
   // Splashing のポップ: フレネル閃光(指数減衰)+ α フェード
   // 裁定 A36: しぶきと同時に光る bloom バーストの主犯だったため 6.0→2.0 に減衰
@@ -159,6 +176,7 @@ varying float vSeed;
 ${SKY_CHUNK_GLSL}
 ${IRID_CHUNK_GLSL}
 ${MIZU_BLUE_GLSL}
+${WATER_TINT_GLSL}
 
 void main() {
   // 内側の面(BackSide)— ガラスの厚みの向こう側のリム発光(加算)
@@ -170,8 +188,9 @@ void main() {
   vec3 filmTint = irid(pow(1.0 - ndv, 1.4) * 1.8 + vSeed * 0.61 - uTimeSec * 0.011);
   vec3 color = (sky(reflect(viewDir, nWorld)) * 0.30 + filmTint * 0.34) * rim;
 
-  // メニスカスのかすかな裏写り
-  color += MIZU_BLUE * exp(-pow((vLocalPos.y - vWaterLevel) / 0.07, 2.0)) * 0.20;
+  // メニスカスのかすかな裏写り(A44: tint 係数で体積・キャップと追従)
+  vec3 waterColor = mix(MIZU_BLUE, MIZU_LIGHT, waterTint(vSeed));
+  color += waterColor * exp(-pow((vLocalPos.y - vWaterLevel) / 0.07, 2.0)) * 0.20;
 
   float fade = (vState == 4.0) ? 1.0 - vProg : 1.0;
   gl_FragColor = vec4(color * fade * 0.55, 1.0);

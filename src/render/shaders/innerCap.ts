@@ -1,4 +1,8 @@
-import { BUBBLE_INSTANCE_VERTEX_PARS_GLSL, MIZU_BLUE_GLSL } from './glass';
+import {
+  BUBBLE_INSTANCE_VERTEX_PARS_GLSL,
+  MIZU_BLUE_GLSL,
+  WATER_TINT_GLSL,
+} from './glass';
 import { BUBBLE_STATE_TRANSFORM_GLSL, WATER_VISUAL_RATIO } from './innerWater';
 import { SKY_CHUNK_GLSL, SKY_UNIFORMS_GLSL } from './sky';
 
@@ -84,6 +88,7 @@ varying float vFill;
 varying float vSeed;
 ${SKY_CHUNK_GLSL}
 ${MIZU_BLUE_GLSL}
+${WATER_TINT_GLSL}
 const vec3 MIZU_DEEP = vec3(0.0, 0.030, 0.160);
 
 void main() {
@@ -110,21 +115,26 @@ void main() {
   float ndv = max(dot(-viewDir, n), 0.0);
   float fresnel = 0.02 + 0.98 * pow(1.0 - ndv, 5.0);
 
+  // A44: 体積(innerWater)・メニスカス(glass)と同じ tint 係数で追従
+  float tint = waterTint(vSeed);
+  vec3 baseColor = mix(MIZU_BLUE * 0.95, MIZU_LIGHT, tint * 0.7);
+
   // A39: 体積(innerWater)の淡色化に合わせ、キャップも明るめ基調 + 浅めの
   // 深色ミックスへ(境目で色が跳ねない — A31 の地続き原則を維持)
-  vec3 body = mix(MIZU_BLUE * 0.95, MIZU_DEEP, 0.22 + 0.34 * vFill);
+  vec3 body = mix(baseColor, MIZU_DEEP, 0.22 + 0.34 * vFill);
   body += uSssColor * min(length(n.xz) * 1.4, 0.35);   // リング波頭のターコイズ(控えめ)
 
-  // 空の映り込みは MIZU_BLUE で色相を引き戻してから弱めに混ぜる(白飛び防止)
-  vec3 reflection = mix(sky(reflect(viewDir, n)), MIZU_BLUE, 0.55);
+  // 空の映り込みは baseColor で色相を引き戻してから弱めに混ぜる(白飛び防止)
+  vec3 reflection = mix(sky(reflect(viewDir, n)), baseColor, 0.55);
   vec3 color = mix(body, reflection, fresnel * 0.40);
   vec3 halfDir = normalize(uSunDir - viewDir);
   color += uSunColor * (0.5 * pow(max(dot(n, halfDir), 0.0), 300.0));
 
-  // 縁(92% 以遠)はメニスカス帯(§3)へ滑らかに接続
-  color += MIZU_BLUE * smoothstep(0.92, 1.0, vRadial) * 1.1;
+  // 縁(92% 以遠)はメニスカス帯(§3)へ滑らかに接続(A44: tint 追従)
+  color += baseColor * smoothstep(0.92, 1.0, vRadial) * 1.1;
 
-  float alpha = 0.8 * smoothstep(0.0, 0.03, vFill); // A39: 淡色化に合わせ僅かに透過
+  // A39: 淡色化に合わせ僅かに透過。A44: 薄い個体は α 上限もやや下げる
+  float alpha = 0.8 * mix(1.0, 0.85, tint) * smoothstep(0.0, 0.03, vFill);
   gl_FragColor = vec4(color, alpha);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
