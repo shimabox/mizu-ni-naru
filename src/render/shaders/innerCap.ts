@@ -115,12 +115,16 @@ void main() {
   float fresnel = 0.02 + 0.98 * pow(1.0 - ndv, 5.0);
 
   // A44: 体積(innerWater)・メニスカス(glass)と同じ tint 係数で追従
+  // A48: ユーザー追撃指示「もっと濃くていい」— 体積(innerWater)と同じ
+  // 基調(MIZU_BLUE を MIZU_DEEP へ 15% 沈めた色)を出発点にし、tint による
+  // 淡色化も 0.7→0.5 倍に弱める
   float tint = waterTint(vSeed);
-  vec3 baseColor = mix(MIZU_BLUE * 0.95, MIZU_LIGHT, tint * 0.7);
+  vec3 baseColor = mix(mix(MIZU_BLUE, MIZU_DEEP, 0.15), MIZU_LIGHT, tint * 0.5);
 
-  // A39: 体積(innerWater)の淡色化に合わせ、キャップも明るめ基調 + 浅めの
-  // 深色ミックスへ(境目で色が跳ねない — A31 の地続き原則を維持)
-  vec3 body = mix(baseColor, MIZU_DEEP, 0.22 + 0.34 * vFill);
+  // A48: 体積(innerWater)の濃色化に合わせ、キャップも濃いめ基調 + やや
+  // 深めの深色ミックスへ(0.22+0.34*vFill → 0.34+0.46*vFill、境目で色が
+  // 跳ねない — A31 の地続き原則を維持)
+  vec3 body = mix(baseColor, MIZU_DEEP, 0.34 + 0.46 * vFill);
   body += uSssColor * min(length(n.xz) * 1.4, 0.35);   // リング波頭のターコイズ(控えめ)
 
   // 空の映り込みは baseColor で色相を引き戻してから弱めに混ぜる(白飛び防止)
@@ -132,8 +136,9 @@ void main() {
   // 縁(92% 以遠)はメニスカス帯(§3)へ滑らかに接続(A44: tint 追従)
   color += baseColor * smoothstep(0.92, 1.0, vRadial) * 1.1;
 
-  // A39: 淡色化に合わせ僅かに透過。A44: 薄い個体は α 上限もやや下げる
-  float alpha = 0.8 * mix(1.0, 0.85, tint) * smoothstep(0.0, 0.03, vFill);
+  // A48: 濃色化に合わせ α 上限を 0.8→0.94 に引き上げ。A44: 薄い個体は
+  // α 上限もやや下げる
+  float alpha = 0.94 * mix(1.0, 0.82, tint) * smoothstep(0.0, 0.03, vFill);
   gl_FragColor = vec4(color, alpha);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>

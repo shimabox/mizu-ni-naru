@@ -119,14 +119,21 @@ void main() {
   // 弱め・基調色を淡いアクアへ・α 上限も下げる方向でキャップ/メニスカスと追従
   float tint = waterTint(vSeed);
 
-  // A39: 「色が濃い」— 吸収を弱め(1.9/0.75/0.35 → 1.2/0.5/0.24)、深色への
-  // 沈み込みを 0.6 倍に、透過も上げて向こうの景色がうっすら通る薄い水色に
-  vec3 absorb = exp(-len / max(vR, 1e-5) * vec3(1.2, 0.5, 0.24) * (1.0 - 0.45 * tint)); // 青が生き残る
-  vec3 baseColor = mix(MIZU_BLUE * 0.95, MIZU_LIGHT, tint * 0.7);
-  vec3 color = mix(baseColor, MIZU_DEEP, (1.0 - absorb.b) * 0.6)
+  // A48: 「もっと濃くていい — 深い青の水がたっぷり入っている存在感」
+  // (ユーザー追撃指示)。A39 で薄めた基調をほぼ撤回し、吸収係数を A39 前
+  // (1.9/0.75/0.35)よりやや強い 2.1/0.85/0.40 へ、深色への沈み込みも
+  // 0.6→0.92 倍に強化。基調は MIZU_BLUE をベースに MIZU_DEEP へ 15% 沈めた
+  // 色から出発し(×0.95 の減衰を撤廃した上でさらに深く)、tint による
+  // 淡色化も 0.7→0.5 倍に弱めてレンジ全体を濃い方へシフト。ただし完全な
+  // 不透明の塊にはしない — α 上限は 0.94 に留め、absorb 経由の深色ミックス
+  // も 1.0 未満(0.92)で floor を残し、僅かな透過を保つ。per-bubble tint
+  // (A44/A47)の相対濃淡差はレンジごとの平行移動で維持
+  vec3 absorb = exp(-len / max(vR, 1e-5) * vec3(2.1, 0.85, 0.40) * (1.0 - 0.35 * tint)); // 青が生き残る
+  vec3 baseColor = mix(mix(MIZU_BLUE, MIZU_DEEP, 0.15), MIZU_LIGHT, tint * 0.5);
+  vec3 color = mix(baseColor, MIZU_DEEP, (1.0 - absorb.b) * 0.92)
              + uSssColor * 0.10 *
                texture2D(uNoise, vLocalPos.xz * 2.0 + uTimeSec * 0.05).r;
-  float alpha = clamp(0.42 + 0.38 * (1.0 - absorb.b), 0.0, 0.8) * mix(1.0, 0.75, tint);
+  float alpha = clamp(0.55 + 0.5 * (1.0 - absorb.b), 0.0, 0.94) * mix(1.0, 0.82, tint);
   alpha *= smoothstep(0.0, 0.03, vFill); // 空球の極小レンズを消す
 
   // A43(改訂): 波紋(キャップと同じ解析リング波 — 伝播 0.9 u/s・減衰 1.8/s、
