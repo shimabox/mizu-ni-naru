@@ -23,21 +23,29 @@ const TWO_PI = 2 * Math.PI;
 
 const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
 
-/** ティア → グリッド密度(design-render §9.3)。 */
+/**
+ * ティア → グリッド密度(design-render §9.3)。
+ * A52 最終: エフェクト(世界の空気)は解像度より優先度が高いため tier2 まで
+ * フル密度を温存、削減は tier3 以降のみ。
+ */
 const GRID_BY_TIER: readonly (readonly [number, number])[] = [
+  [144, 192],
   [144, 192],
   [144, 192],
   [120, 160],
   [96, 128],
-  [72, 96],
 ];
 
-/** ティア → analyticReflections on/off(design-render §9.3 — tier3/4 は off)。 */
+/**
+ * ティア → analyticReflections on/off(design-render §9.3)。
+ * A52 最終: 海面の映り込みは世界の空気を作る要素として tier3 まで生存させ、
+ * off になるのは最終防衛ラインの tier4 のみ。
+ */
 const ANALYTIC_REFLECTIONS_BY_TIER: readonly boolean[] = [
   true,
   true,
   true,
-  false,
+  true,
   false,
 ];
 

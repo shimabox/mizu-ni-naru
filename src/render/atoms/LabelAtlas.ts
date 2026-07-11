@@ -3,7 +3,7 @@ import { CanvasTexture, LinearFilter, LinearMipmapLinearFilter } from 'three';
 /**
  * 自前グリフアトラス(design-render §5)。
  *
- * 1024×256 canvas に 256² セル ×4(H / O / H₂ / 予備)。**セル順 = KIND_INDEX**。
+ * 1536×384 canvas に 384² セル ×4(H / O / H₂ / 予備)。**セル順 = KIND_INDEX**。
  * H₂ の下付きは「小フォント + ベースライン下げ」の 2 フォントトリック。
  * troika(1 Text = 1 draw)は不採用 — 全ラベルを 1 draw で描くため。
  *
@@ -13,10 +13,19 @@ import { CanvasTexture, LinearFilter, LinearMipmapLinearFilter } from 'three';
  * - A = 両者の合計被覆(αブレンドのアルファ)
  * ストローク(#f00)→ フィル(#0f0)の順に描くと重なり部はフィルが上書きし、
  * R はエッジ専用・G は本体専用にきれいに分離する。
+ *
+ * A52(2026-07-11 ユーザー指示「文字の見せ方もあるだろうし」— renderScale が
+ * tier1 から早期に下がる新ティア表に対応): セル解像度を 256→384(1.5倍)に
+ * 引き上げ、縁取り幅も比例以上に太く(§STROKE_WIDTH)。ミニフィケーション時
+ * (renderScale/dprCap 低下でビルボードの画面占有 texel 密度が下がる場面)は
+ * GPU が自動でミップレベルを選ぶため、ソース解像度が高いほど選ばれるミップの
+ * 実効サンプル密度も高く保たれ、縁取りが潰れにくい。フィルタリングは
+ * 従来通り LinearMipmapLinearFilter(三線形)— ビルボードは常にカメラ正対
+ * なので異方性フィルタリングの恩恵はなく不要。
  */
-export const LABEL_ATLAS_WIDTH = 1024;
-export const LABEL_ATLAS_HEIGHT = 256;
-export const LABEL_CELL_SIZE = 256;
+export const LABEL_ATLAS_WIDTH = 1536;
+export const LABEL_ATLAS_HEIGHT = 384;
+export const LABEL_CELL_SIZE = 384;
 export const LABEL_CELL_COUNT = 4;
 
 export interface LabelCell {
@@ -59,12 +68,16 @@ const GLYPHS: readonly { main: string; sub?: string }[] = [
   { main: 'H', sub: '2' },
 ];
 
-const MAIN_FONT = 'bold 150px "Helvetica Neue", Arial, sans-serif';
-const SUB_FONT = 'bold 90px "Helvetica Neue", Arial, sans-serif';
-/** 下付きのベースライン下げ(px)。 */
-const SUB_BASELINE_DROP = 48;
-/** 縁取り幅(px — 片側 ≈ lineWidth/2。150px フォント比で細めのエッジ)。 */
-const STROKE_WIDTH = 18;
+const MAIN_FONT = 'bold 225px "Helvetica Neue", Arial, sans-serif';
+const SUB_FONT = 'bold 135px "Helvetica Neue", Arial, sans-serif';
+/** 下付きのベースライン下げ(px、セル 1.5 倍化に比例)。 */
+const SUB_BASELINE_DROP = 72;
+/**
+ * 縁取り幅(px — 片側 ≈ lineWidth/2)。A52: セル解像度の 1.5 倍化に比例
+ * (18→27)させるだけでなく、renderScale が早期に下がる新ティア表向けに
+ * さらに一段太く(30)— ダウンスケール時に縁取りが痩せて消えるのを防ぐ。
+ */
+const STROKE_WIDTH = 30;
 
 /** グリフの各パーツ(主文字/下付き)を stroke → fill の 2 パスで描く。 */
 const drawGlyphPasses = (

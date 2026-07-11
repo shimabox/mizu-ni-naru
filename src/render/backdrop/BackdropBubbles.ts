@@ -18,8 +18,12 @@ import {
 /** 遠景フィールドの個体数(裁定 A41 — 「もっと多くの球体で壮大に」)。 */
 export const BACKDROP_COUNT_DESKTOP = 250;
 export const BACKDROP_COUNT_MOBILE = 100;
-/** ティア → backdropCount 比率(Phase 4 AdaptiveQuality の追加ノブ)。 */
-const COUNT_FRACTION_BY_TIER: readonly number[] = [1.0, 1.0, 0.6, 0.3, 0.15];
+/**
+ * ティア → backdropCount 比率(Phase 4 AdaptiveQuality の追加ノブ)。
+ * A52 最終: エフェクト(世界の空気)は解像度より優先度が高いため tier2 まで
+ * 完全温存(1.0)、削減は tier3 以降のみ。
+ */
+const COUNT_FRACTION_BY_TIER: readonly number[] = [1.0, 1.0, 1.0, 0.6, 0.3];
 
 /**
  * 遠景の書き割り球体フィールド(design-render 拡張 — 裁定 A41)。
@@ -100,6 +104,11 @@ export class BackdropBubbles implements RenderSystem {
     this.material.uniforms.uTimeSec.value = frame.timeSec;
   }
 
+  /**
+   * countFraction のみを変える — **球体ジオメトリの分割レベル(detail2)は
+   * ティア非対象**(A52 不変条件「球体は球に見えるように、妥協しない」)。
+   * 減らすのは遠景球の個数だけで、残った球 1 個ずつの丸さは全ティアで不変。
+   */
   public applyTier(tier: QualityTier): void {
     this.countFraction = COUNT_FRACTION_BY_TIER[tier];
   }

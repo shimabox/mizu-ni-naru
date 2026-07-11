@@ -15,8 +15,13 @@ import { createBillboardQuadGeometry, writeCameraBasis } from './billboard';
 /** 距離カットオフ(裁定 A32)。判読できなくなる距離の視覚調整値(u)。 */
 const LABEL_CUTOFF_DISTANCE = 15;
 const LABEL_CUTOFF_FADE = 4;
-/** ティア → labelDensity(design-render §9.3)。負荷時は文字数そのものを間引く。 */
-const DENSITY_BY_TIER: readonly number[] = [1.0, 1.0, 0.75, 0.5, 0.35];
+/**
+ * ティア → labelDensity(design-render §9.3)。負荷時は文字数そのものを間引く。
+ * A52 最終: 文字数そのものは tier2 まで温存、削減は tier3〜4 のみ(ただし
+ * 解像度低下(renderScale)は tier1 から先に始まる — 文字のくっきりさは
+ * LabelAtlas 側の頑健化で補う)。
+ */
+const DENSITY_BY_TIER: readonly number[] = [1.0, 1.0, 1.0, 0.75, 0.5];
 
 /**
  * 原子 = 文字(design-render §5 改: 文字が主役)— 1 draw。

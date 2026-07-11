@@ -33,6 +33,12 @@ import type {
  * 中間品質)。インスタンス属性は BubbleInstanceBuffers を InnerWaterSystem と
  * 共有(アップロード 1 回)。加算優位設計なので球間ソートにほぼ非感応
  * (前後関係は buffers の遠→近順 + renderOrder の far→near 順が担保)。
+ *
+ * A52 不変条件(「球体は球に見えるように、妥協しない」): 本クラスは
+ * applyTier を実装しない — near/far の分割レベル(detail4/detail3)は
+ * どのティアでも固定。品質ラダーで負荷を吸収する対象は他システムの
+ * renderScale/dprCap・エフェクトノブのみで、主役である球体ジオメトリの
+ * 丸さはティア制御の対象外。
  */
 export class BubbleGlassSystem implements RenderSystem {
   public readonly object: Group;

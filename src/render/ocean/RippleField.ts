@@ -47,8 +47,12 @@ import { SPLAT_OUT_STRIDE, SplatScheduler } from './SplatScheduler';
 export const RIPPLE_HALF_EXTENT = 12;
 /** tier0 の解像度(384² → テクセル 0.0625u)。 */
 export const RIPPLE_RESOLUTION = 384;
-/** ティア → rippleSimResolution(design-render §9.3)。 */
-const RESOLUTION_BY_TIER: readonly number[] = [384, 384, 320, 256, 192];
+/**
+ * ティア → rippleSimResolution(design-render §9.3)。
+ * A52 最終: エフェクト(世界の空気)は解像度より優先度が高いため tier2 まで
+ * フル解像度を温存、削減は tier3 以降のみ。
+ */
+const RESOLUTION_BY_TIER: readonly number[] = [384, 384, 384, 320, 256];
 /** 1 フレームに描けるスプラット上限(instanced quad 容量)。 */
 const SPLAT_CAPACITY = 64;
 

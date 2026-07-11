@@ -36,6 +36,7 @@ window.addEventListener('DOMContentLoaded', () => {
   const renderer = new SceneRenderer(canvas, {
     maxPixelRatio: params.dpr,
     parallax: !params.measure,
+    isMobile,
   });
 
   // 計測フック(E2E 検証・ベンチ用: SimCounts の読み出し。

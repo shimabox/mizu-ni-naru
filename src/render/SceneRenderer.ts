@@ -9,8 +9,8 @@ import type { SkyRenderView, SkyRenderer } from '../contract/RenderView';
 import { STEP_HZ } from '../contract/WorldSpec';
 import {
   BLOOM_SCALE_BY_TIER,
-  DPR_CAP_BY_TIER,
   RENDER_SCALE_BY_TIER,
+  dprCapForTier,
 } from './AdaptiveQuality';
 import { CameraRig } from './CameraRig';
 import { Environment } from './Environment';
@@ -36,6 +36,11 @@ export interface SceneRendererOptions {
   readonly maxPixelRatio?: number;
   /** false でマウス視差・ドラッグ/ズーム操作を無効化(`?m=1`)。 */
   readonly parallax?: boolean;
+  /**
+   * モバイル判定(app 層 §7.1 と同型の viewport 幅判定 — 裁定 A16)。
+   * A52: dprCap をティア表に関わらず 1.75 に抑える(dprCapForTier)。
+   */
+  readonly isMobile?: boolean;
 }
 
 /**
@@ -52,6 +57,8 @@ export class SceneRenderer implements SkyRenderer {
   private readonly systems: RenderSystem[] = [];
   /** `?dpr=` の明示上限(指定時はティアの dprCap より優先)。 */
   private readonly dprOverride: number | undefined;
+  /** A52: モバイルは dprCap を全ティアで 1.75 に上限。 */
+  private readonly isMobile: boolean;
   private readonly noiseTexture: DataTexture;
   private readonly post: PostPipeline;
   private readonly bubbleBuffers: BubbleInstanceBuffers;
@@ -76,6 +83,7 @@ export class SceneRenderer implements SkyRenderer {
     this.renderer.outputColorSpace = SRGBColorSpace;
 
     this.dprOverride = options?.maxPixelRatio;
+    this.isMobile = options?.isMobile ?? false;
 
     this.scene = new Scene();
     this.cameraRig = new CameraRig({
@@ -171,7 +179,7 @@ export class SceneRenderer implements SkyRenderer {
    * SkyRenderer 契約には無い拡張 API — app 層は SceneRenderer を直接束縛して呼ぶ。
    */
   public applyTier(tier: QualityTier): void {
-    this.tierDprCap = DPR_CAP_BY_TIER[tier];
+    this.tierDprCap = dprCapForTier(tier, this.isMobile);
     this.tierRenderScale = RENDER_SCALE_BY_TIER[tier];
     this.post.setBloomScale(BLOOM_SCALE_BY_TIER[tier]);
     for (const system of this.systems) {

@@ -9,19 +9,19 @@ import {
 } from '../../src/render/atoms/LabelAtlas';
 
 describe('LabelAtlas のセル座標(design-render §5)', () => {
-  it('アトラス構成: 1024×256・256² セル ×4', () => {
-    expect(LABEL_ATLAS_WIDTH).toBe(1024);
-    expect(LABEL_ATLAS_HEIGHT).toBe(256);
-    expect(LABEL_CELL_SIZE).toBe(256);
+  it('アトラス構成: 1536×384・384² セル ×4(A52: 256→384 に引き上げ)', () => {
+    expect(LABEL_ATLAS_WIDTH).toBe(1536);
+    expect(LABEL_ATLAS_HEIGHT).toBe(384);
+    expect(LABEL_CELL_SIZE).toBe(384);
     expect(LABEL_CELL_COUNT).toBe(4);
   });
 
   it('セル順 = KIND_INDEX(H=0, O=1, H2=2)で位置と UV が整合する', () => {
     for (const kind of Object.values(KIND_INDEX)) {
       const cell = labelCellRect(kind);
-      expect(cell.x).toBe(kind * 256);
+      expect(cell.x).toBe(kind * 384);
       expect(cell.y).toBe(0);
-      expect(cell.size).toBe(256);
+      expect(cell.size).toBe(384);
       expect(cell.u0).toBeCloseTo(kind * 0.25, 10);
       expect(cell.u1).toBeCloseTo((kind + 1) * 0.25, 10);
       expect(cell.v0).toBe(0);

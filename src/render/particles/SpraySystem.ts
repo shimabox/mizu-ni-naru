@@ -34,7 +34,11 @@ export const SPRAY_CAPACITY = 4096;
 const MAX_LIFE_STEPS = 1.7 * 60 + 10;
 /** 「未スポーン」を示す spawnStepF(age が巨大 → kill)。 */
 const NEVER_SPAWNED = -1e6;
-/** ティア → spray 上限(発生数の予算比率。Phase 4 AdaptiveQuality の追加ノブ)。 */
+/**
+ * ティア → spray 上限(発生数の予算比率。Phase 4 AdaptiveQuality の追加ノブ)。
+ * A52 最終: エフェクト(世界の空気)は解像度より優先度が高いため tier1 まで
+ * 完全温存(1.0)、削減は tier2 以降のみ。
+ */
 const BUDGET_BY_TIER: readonly number[] = [1.0, 1.0, 0.8, 0.6, 0.4];
 
 const TWO_PI = 2 * Math.PI;
