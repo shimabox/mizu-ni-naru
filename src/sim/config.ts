@@ -233,6 +233,15 @@ export const SPLASHING_DURATION_S = 0.8;
 export const RESPAWN_DELAY_MIN_S = 4;
 export const RESPAWN_DELAY_MAX_S = 10;
 /**
+ * A66: 初期化専用のバースト窓(通常再湧きの RESPAWN_DELAY_MIN_S/MAX_S とは別物 —
+ * 通常プレイ中の Splashing→Dead→再湧きには一切使わない)。init() で
+ * INITIAL_VISIBLE_SLOT 以外を Dead 化する際の deadDurationSteps ロールにのみ
+ * 使用し、最初の画面が「実球1個だけ」で最大10s近く寂しく見える問題を、
+ * 0〜3 s の短いバースト窓に散らして解消する。
+ */
+export const INITIAL_SPAWN_STAGGER_MIN_S = 0;
+export const INITIAL_SPAWN_STAGGER_MAX_S = 3;
+/**
  * 起動スタッガー: 初期 fill を 0.75 幅で散らし、起動 10〜15 s で初落下・以降
  * ≈16 s 間隔(§2.5)。A40 で F_FULL 0.6→[0.8,0.95] に伴い比例引き上げ。
  * 上限 0.75 + ジッター 0.03 = 0.78 < F_FULL_MIN 0.8 — 起動直後に

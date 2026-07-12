@@ -34,10 +34,10 @@ import {
   F_FULL_MIN,
   INITIAL_FILL_JITTER,
   INITIAL_FILL_MAX,
+  INITIAL_SPAWN_STAGGER_MAX_S,
+  INITIAL_SPAWN_STAGGER_MIN_S,
   NEAR_RING_COUNT_DESKTOP,
   NEAR_RING_COUNT_MOBILE,
-  RESPAWN_DELAY_MAX_S,
-  RESPAWN_DELAY_MIN_S,
   SAG_MAX,
   SPAWN_INTERVAL_STEPS_DESKTOP,
   SPAWN_INTERVAL_STEPS_MOBILE,
@@ -188,13 +188,18 @@ export class MizuNiNaruSim implements SimLike {
     // 追加しない)。RNG 消費順: 各スロットの placement/fill ロール一式
     // (rollSlot、上のループ)がスロット昇順に完了した後、このループで
     // deadDurationSteps ロールをスロット昇順に追加消費する(§7.1)。
+    // A66: この deadDurationSteps ロールは INITIAL_SPAWN_STAGGER_MIN_S/MAX_S
+    // (0〜3 s)を使う — 通常再湧きの RESPAWN_DELAY_MIN_S/MAX_S(4〜10 s)を
+    // そのまま初期化に流用すると最初の画面が最大 10 s 近く実球 1 個だけに
+    // なり寂しく見えるため、初期化専用の短いバースト窓に差し替える。
     const INITIAL_VISIBLE_SLOT = 0;
     for (let i = 0; i < this.slotCount; i++) {
       if (i === INITIAL_VISIBLE_SLOT) continue;
       const slot = this.slots[i];
       const deadDurationSteps = Math.round(
-        (RESPAWN_DELAY_MIN_S +
-          this.rng.next() * (RESPAWN_DELAY_MAX_S - RESPAWN_DELAY_MIN_S)) *
+        (INITIAL_SPAWN_STAGGER_MIN_S +
+          this.rng.next() *
+            (INITIAL_SPAWN_STAGGER_MAX_S - INITIAL_SPAWN_STAGGER_MIN_S)) *
           STEP_HZ,
       );
       slot.fsm.enterDead(deadDurationSteps);
