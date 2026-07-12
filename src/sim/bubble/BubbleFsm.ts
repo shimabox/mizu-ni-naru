@@ -76,6 +76,22 @@ export class BubbleFsm {
     this.fallY0 = 0;
   }
 
+  /**
+   * 初期化時の段階湧き(A65)専用: rollSlot が設定した Spawning を Dead へ
+   * 上書きする。Splashing→Dead 通常遷移(RNG 消費は呼び出し側が既に済ませ、
+   * deadDurationSteps を引数で渡す)と同じ着地状態にする — wobble/wobblePulse
+   * は Splashing 満了時と同様 0 にリセットする。
+   */
+  public enterDead(deadDurationSteps: number): void {
+    this.state = BUBBLE_STATE.Dead;
+    this.stateStep = 0;
+    this.wobble = 0;
+    this.wobblePulse = 0;
+    this.fallV = 0;
+    this.fallY0 = 0;
+    this.deadDurationSteps = deadDurationSteps;
+  }
+
   /** 雫着水の wobble パルス(§2.2)。 */
   public addWobblePulse(): void {
     this.wobblePulse = Math.min(this.wobblePulse + WOBBLE_PULSE, 1);

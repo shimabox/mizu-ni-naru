@@ -10,6 +10,7 @@ import {
   DT,
   KIND_INDEX,
   SLOT_COUNT_MOBILE,
+  STEP_HZ,
 } from '../contract/WorldSpec';
 import { BubbleFsm, FSM_EVENT } from './bubble/BubbleFsm';
 import {
@@ -35,6 +36,8 @@ import {
   INITIAL_FILL_MAX,
   NEAR_RING_COUNT_DESKTOP,
   NEAR_RING_COUNT_MOBILE,
+  RESPAWN_DELAY_MAX_S,
+  RESPAWN_DELAY_MIN_S,
   SAG_MAX,
   SPAWN_INTERVAL_STEPS_DESKTOP,
   SPAWN_INTERVAL_STEPS_MOBILE,
@@ -174,6 +177,28 @@ export class MizuNiNaruSim implements SimLike {
     }
     for (let i = 0; i < this.slotCount; i++) {
       this.rollSlot(i, true);
+    }
+    // A65(段階湧き): rollSlot は全スロットを Spawning にするが、それだと
+    // t=0 で全実球が glass.ts の Spawning 専用 grow アニメ(§ glow の
+    // 「ポヨン」演出)を同時発火し「集団でグッと丸くなる」ように見える。
+    // 1 個(INITIAL_VISIBLE_SLOT)だけ rollSlot の Spawning を残し、残りは
+    // 既存の Splashing→Dead 遷移と同じ着地状態(Dead + 乱数遅延
+    // deadDurationSteps + fill01=0)に上書きすることで、通常の
+    // Dead→RespawnDue→rollSlot 再湧き機構に乗せる(新規アニメ機構は
+    // 追加しない)。RNG 消費順: 各スロットの placement/fill ロール一式
+    // (rollSlot、上のループ)がスロット昇順に完了した後、このループで
+    // deadDurationSteps ロールをスロット昇順に追加消費する(§7.1)。
+    const INITIAL_VISIBLE_SLOT = 0;
+    for (let i = 0; i < this.slotCount; i++) {
+      if (i === INITIAL_VISIBLE_SLOT) continue;
+      const slot = this.slots[i];
+      const deadDurationSteps = Math.round(
+        (RESPAWN_DELAY_MIN_S +
+          this.rng.next() * (RESPAWN_DELAY_MAX_S - RESPAWN_DELAY_MIN_S)) *
+          STEP_HZ,
+      );
+      slot.fsm.enterDead(deadDurationSteps);
+      slot.world.drainWater();
     }
     this.packSlots();
   }
