@@ -63,14 +63,16 @@ const parseArgs = (): { seconds: number; seeds: number[]; out: string } => {
 };
 
 const run = (
-  preset: string,
+  preset: 'desktop' | 'mobile',
   slotCount: number,
   nearCount: number,
   seed: number,
   seconds: number,
 ): RunResult => {
   const sim = new MizuNiNaruSim();
-  sim.init({ seed, slotCount });
+  // A70: pacing を明示指定(SLOT_COUNT_DESKTOP/MOBILE の大小関係からの推測に
+  // 依存しない — src/app/main.ts と同じ理由。詳細は master-plan.md A70 参照)
+  sim.init({ seed, slotCount, pacing: preset });
   const steps = Math.round(seconds * STEP_HZ);
   const prevState = new Int32Array(slotCount).fill(-1);
   const driftEntryStep = new Float64Array(slotCount).fill(-1);
@@ -152,7 +154,7 @@ const main = (): void => {
   mkdirSync(out, { recursive: true });
 
   const presets: {
-    name: string;
+    name: 'desktop' | 'mobile';
     slots: number;
     nearCount: number;
     ivBand: [number, number];

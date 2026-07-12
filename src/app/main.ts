@@ -29,7 +29,11 @@ window.addEventListener('DOMContentLoaded', () => {
   // 既定は実 sim(Phase 1)。`?sim=stub` で StubSim(render 開発用の合成アニメ)
   const sim: SimLike =
     params.sim === 'stub' ? new StubSim() : new MizuNiNaruSim();
-  sim.init({ seed, slotCount });
+  // pacing は SLOT_COUNT_DESKTOP/MOBILE の大小関係に依存した推測(sim 側の
+  // フォールバック)に頼らず、app 層が既に持つ正しい isMobile から明示的に
+  // 渡す(A70: SLOT_COUNT_DESKTOP と SLOT_COUNT_MOBILE が同値になったことで
+  // 推測ロジックが機能しなくなったため — master-plan.md A70 参照)。
+  sim.init({ seed, slotCount, pacing: isMobile ? 'mobile' : 'desktop' });
 
   // SceneRenderer を具象型で束縛(applyTier は SkyRenderer 契約外の拡張 API —
   // Phase 4 AdaptiveQuality 用。app 層は render 層に直接依存してよい)

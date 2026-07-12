@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { SimInitOptions } from '../../src/contract/RenderView';
 import { SLOT_COUNT_DESKTOP } from '../../src/contract/WorldSpec';
 import { MizuNiNaruSim } from '../../src/sim/MizuNiNaruSim';
 
@@ -10,7 +11,13 @@ import { MizuNiNaruSim } from '../../src/sim/MizuNiNaruSim';
  * 総和チェックサム・SimCounts・累計イベント数を記録値で assert する
  * (高速・決定論の番犬として十分 — 球数を増やしても検知力は変わらない)。
  * 加えて 96 球(A35 構成)× 400 step の短いチェックサムを 1 本だけ追加し、
- * desktop スロット構成そのものの回帰を検知する。
+ * desktop スロット構成そのものの回帰を検知する。**A70 でこの呼び出しは
+ * `pacing: 'desktop'` を明示指定するよう変更した** — SLOT_COUNT_DESKTOP=96
+ * の間は `slotCount <= SLOT_COUNT_MOBILE` のフォールバック推測でも desktop
+ * に倒れるため今回のチェックサムへの影響はないが、desktop/mobile の
+ * スロット数を将来揃える変更(別タスク)が入っても desktop pacing 経路
+ * (A65〜A68 の段階湧き含む)のテストカバレッジが失われないための予防線
+ * (詳細は master-plan.md A70 参照)。
  *
  * ⚠ このテストが壊れたら:
  * 1. まず RNG 呼び順規約(src/sim/chem/AtomFactory.ts の doc)からの
@@ -50,9 +57,13 @@ interface GoldenRecord {
   meanFill01: number;
 }
 
-const runGolden = (slotCount: number, steps = 1800): GoldenRecord => {
+const runGolden = (
+  slotCount: number,
+  steps = 1800,
+  pacing?: SimInitOptions['pacing'],
+): GoldenRecord => {
   const sim = new MizuNiNaruSim();
-  sim.init({ seed: 7, slotCount });
+  sim.init({ seed: 7, slotCount, pacing });
   let splashSum = 0;
   let rippleSum = 0;
   for (let s = 0; s < steps; s++) {
@@ -204,6 +215,16 @@ const runGolden = (slotCount: number, steps = 1800): GoldenRecord => {
  * ロールされるのは mobile でも index 0 のままのため)。96 球スモーク
  * (desktop 扱い)は A68 の分岐条件により従来どおり段階湧きループが実行され、
  * 数値上ビット単位で不変(実測で再確認済み)。
+ * 2026-07-12(再記録なし・A70): src/app/main.ts の pacing 推測ロジックの
+ * 根本修正(isMobile から pacing を明示的に渡すよう変更)に合わせ、96 球
+ * スモークの `runGolden` 呼び出しにも `pacing: 'desktop'` を明示指定する
+ * よう変更(desktop/mobile のスロット数を揃える将来の変更が入っても
+ * desktop pacing 経路のテストカバレッジが失われないための予防線)。
+ * 現時点では SLOT_COUNT_DESKTOP=96 > SLOT_COUNT_MOBILE=24 のため、明示指定
+ * しても既存のフォールバック推測(`slotCount <= SLOT_COUNT_MOBILE` →
+ * mobile)と同じ 'desktop' に解決され、RNG 消費順・下流値は完全に不変
+ * (実測で EXPECTED_SMOKE_96 がビット単位で一致することを確認済み — 再記録
+ * 不要)。詳細は master-plan.md A70 参照。
  */
 const EXPECTED_MAIN: GoldenRecord = {
   bubbles: 96.21230888972059,
@@ -270,7 +291,12 @@ describe('MizuNiNaruSim ゴールデン(seed=7)', () => {
   });
 
   it('96 球スモーク(近 12 + フィールド 84・400 step)が記録値と一致する', () => {
-    assertGolden(runGolden(SLOT_COUNT_DESKTOP, 400), EXPECTED_SMOKE_96);
+    // A70: pacing を明示指定(desktop pacing 経路のカバレッジをスロット数の
+    // 大小関係に依存させないための予防線 — 上のファイル doc コメント参照)
+    assertGolden(
+      runGolden(SLOT_COUNT_DESKTOP, 400, 'desktop'),
+      EXPECTED_SMOKE_96,
+    );
   });
 
   it('2 回実行が同一(同一プロセス内の再現性 — init が完全リセットする)', () => {
