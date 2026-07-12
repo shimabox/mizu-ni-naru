@@ -54,7 +54,10 @@ export class BackdropBubbles implements RenderSystem {
   private countFraction = 1.0;
 
   constructor(sun: SunUniforms) {
-    const base = new IcosahedronGeometry(1, 2); // 遠景・小径 — A51: detail1→2 でファセット低減
+    // 遠景・小径 — A51: detail1→2 でファセット低減。A60: 4度目の「多角形」再発の
+    // 真犯人と確定(A51/A54/A58 は実シム球のみ修正しこちらは放置されていた)。
+    // 実シム球(BubbleGlassSystem/InnerWaterSystem)と同じ detail4(500tri)に統一。
+    const base = new IcosahedronGeometry(1, 4);
     this.geometry = new InstancedBufferGeometry();
     this.geometry.setIndex(base.getIndex());
     this.geometry.setAttribute(
@@ -105,7 +108,7 @@ export class BackdropBubbles implements RenderSystem {
   }
 
   /**
-   * countFraction のみを変える — **球体ジオメトリの分割レベル(detail2)は
+   * countFraction のみを変える — **球体ジオメトリの分割レベル(detail4、A60)は
    * ティア非対象**(A52 不変条件「球体は球に見えるように、妥協しない」)。
    * 減らすのは遠景球の個数だけで、残った球 1 個ずつの丸さは全ティアで不変。
    */

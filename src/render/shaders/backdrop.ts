@@ -111,8 +111,11 @@ void main() {
   vec3 color = sky(reflect(viewDir, n)) * (0.25 + 0.45 * rim);
   float alpha = 0.05 + 0.30 * rim;
 
-  // 擬似内水: 水面 (local y < vWaterLevel) は #007fff 系がうっすら透ける
-  float water = smoothstep(vWaterLevel + 0.04, vWaterLevel - 0.10, vLocal.y);
+  // 擬似内水: 水面 (local y < vWaterLevel) は #007fff 系がうっすら透ける。
+  // A60: vLocal.y(三角形内の線形補間)ではなく n.y(球面へ正規化した真の高さ)
+  // で判定 — 頂点密度に依存せず境界線が球面曲率に沿って滑らかになる
+  // (rim 計算の n と同じ考え方: position 自体が中心原点からの法線になる)。
+  float water = smoothstep(vWaterLevel + 0.04, vWaterLevel - 0.10, n.y);
   color = mix(color, MIZU_BLUE * 0.55, water * 0.75);
   alpha = mix(alpha, 0.34, water * 0.8);
 
