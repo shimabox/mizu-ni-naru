@@ -19,6 +19,15 @@ import {
 export const BACKDROP_COUNT_DESKTOP = 250;
 export const BACKDROP_COUNT_MOBILE = 100;
 /**
+ * インスタンス用頂点属性バッファの確保サイズ(A69)。
+ * desktop/mobile どちらの値が大きくても取りこぼさないよう、
+ * 決め打ちではなく両者の大きい方でバッファを確保する。
+ */
+const BACKDROP_COUNT_BUFFER = Math.max(
+  BACKDROP_COUNT_DESKTOP,
+  BACKDROP_COUNT_MOBILE,
+);
+/**
  * ティア → backdropCount 比率(Phase 4 AdaptiveQuality の追加ノブ)。
  * A52 最終: エフェクト(世界の空気)は解像度より優先度が高いため tier2 まで
  * 完全温存(1.0)、削減は tier3 以降のみ。
@@ -35,8 +44,9 @@ const COUNT_FRACTION_BY_TIER: readonly number[] = [1.0, 1.0, 1.0, 0.6, 0.3];
  * ハッシュから毎フレーム閉形式で導出する(状態を持たない = 巻き戻し可能、
  * JS 側のアップロードは構築時 1 回のみ)。
  *
- * インスタンス数は desktop 250 / mobile 100(A41)を固定バッファ 250 個ぶん
- * 確保し、`geometry.instanceCount` だけを毎フレーム安く切り替える
+ * インスタンス数は desktop 250 / mobile 100(A41)を、固定バッファ desktop 個ぶん
+ * ではなく両者の大きい方(`BACKDROP_COUNT_BUFFER`、A69)ぶん確保し、
+ * `geometry.instanceCount` だけを毎フレーム安く切り替える
  * (SkyRenderView に slotCount が無いため `bubbles.count` から
  * MizuNiNaruSim と同じ判定式で mobile/desktop を推定 — §7.1 のパシング
  * 判定と同型)。頂点シェーダの `uCount` も同じ値を渡し、間引いても
@@ -66,8 +76,8 @@ export class BackdropBubbles implements RenderSystem {
     );
     base.dispose();
 
-    const aIdx = new Float32Array(BACKDROP_COUNT_DESKTOP);
-    for (let i = 0; i < BACKDROP_COUNT_DESKTOP; i++) aIdx[i] = i;
+    const aIdx = new Float32Array(BACKDROP_COUNT_BUFFER);
+    for (let i = 0; i < BACKDROP_COUNT_BUFFER; i++) aIdx[i] = i;
     this.geometry.setAttribute('aIdx', new InstancedBufferAttribute(aIdx, 1));
     this.geometry.instanceCount = 0; // 初回 update() まで描かない
 
@@ -76,7 +86,7 @@ export class BackdropBubbles implements RenderSystem {
       fragmentShader: BACKDROP_FRAGMENT_GLSL,
       uniforms: {
         uTimeSec: { value: 0 },
-        uCount: { value: BACKDROP_COUNT_DESKTOP },
+        uCount: { value: BACKDROP_COUNT_BUFFER },
         uSunDir: sun.uSunDir,
         uSunColor: sun.uSunColor,
       },
