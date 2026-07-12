@@ -1,102 +1,112 @@
-# 水になる(mizu-ni-naru)
+# 水になる (mizu-ni-naru)
 
-H と O が出会い、雫になり、球体を満たし、海へ還る — ぼーっと眺める水の世界。
+**ぼーっと眺める水の世界**
 
-半透明の球体が空中に何個も浮かんでいる。中では文字 H / O が漂い、`H + H → H2`、
-`H2 + O →` 雫になって球の底に溜まっていく。水が満ちると球は落下し、下界の海に
-着水して弾け「水になる」。新しい球が生まれ、これが永遠に繰り返される。
-
-操作は不要 — スクリーンセーバーのように、放っておけば勝手に世界が進む。
+H と O がぶつかって水になり、球体を満たして海へ還っていく。そんな作品です。  
+WebGLを使っています。
 
 ## デモ
 
-https://app.orukubami.sh/mizu-ni-naru/
+https://mizu-ni-naru.orukubami.sh
 
-![水になる — 満ちていく球体と海](images/demo.png)
+<img src="images/demo.png" width="600" alt="ぼーっと眺める水の世界">
 
 ## 操作
 
-カメラは自動でゆったり漂う(スクリーンセーバー的)。触るとオービットできる:
+カメラは自動でゆっくりと漂います。
 
-- **放置** — 自動でカメラが世界を漂う(リサージュ的な軌道・非反復)
-- **ドラッグ** — クリック/タップしたまま動かすとカメラがオービット
-- **ホイール / ピンチ** — ズーム(距離クランプ付き)
-- 操作をやめて約 5 秒後、自動ドリフトへ滑らかに復帰する
-- `prefers-reduced-motion` を尊重(カメラのドリフトを停止。世界の進行自体は止めない)
+- ドラッグすると、カメラを回転できます。
+- ホイールまたはピンチで、ズームできます。
+- 操作をやめると、約 5 秒後に自動移動へ戻ります。
+- 端末で「視差効果を減らす」などが設定されている場合は、カメラの自動移動を停止します。
 
-## URL パラメータ
+## Mizuシリーズ
 
-|パラメータ|既定|説明|
-|:---|:---|:---|
-|`seed`|(乱数)|RNG シード。同じ値で毎回同じ世界が再現される|
-|`m`|`0`|`1` で計測オーバーレイを表示(FPS/Frame/Update/カウンタ/Tier)。品質は tier0 固定・マウス視差無効・カメラは t=0 起点になる|
-|`q`|(自動)|品質ティアを `0`〜`4` に固定(0 が最高品質)。指定すると自動品質調整(AdaptiveQuality)が無効になる|
-|`dpr`|`2`|`devicePixelRatio` の上限(ベンチマークの機種間比較用)|
-|`sim`|(実 sim)|`stub` で合成アニメの StubSim に差し替え(レンダリング単体の動作確認用)|
-|`slots`|(自動)|球のスロット数を上書き(デバッグ用)。既定はビューポート幅 <768px でモバイル値、それ以外はデスクトップ値|
+Mizuシリーズの最新作です。（2026/07/12 現在）
 
-例: https://app.orukubami.sh/mizu-ni-naru/?seed=7&m=1
+- https://github.com/shimabox/mizu-ni-naru 👈️
+  - WebGL
+- https://github.com/shimabox/Mizu-go
+  - Go（Ebitengine）
+- https://github.com/shimabox/Mizu-ts
+  - TypeScript
+- https://github.com/shimabox/Mizu
+  - JavaScript
 
-## 開発
+## ローカルでの開発
 
-[mise](https://mise.jdx.dev/) が Node.js のバージョンを管理する(`mise.toml` に固定)。
+Node.js 22 と npm を使用します。Node.js のバージョンは [mise](https://mise.jdx.dev) で管理しているため、あらかじめ mise をインストールしてください。
+
+リポジトリを取得し、依存パッケージをインストールします。
 
 ```sh
-# mise のインストール
-curl https://mise.run | sh
-
-# 固定バージョンの Node.js を導入(mise.toml を読む)
+git clone https://github.com/shimabox/mizu-ni-naru.git
+cd mizu-ni-naru
 mise install
-
-# 依存パッケージのインストール
 npm install
 ```
 
-npm スクリプト(`mise exec --` 経由での実行を推奨):
+開発サーバーを起動します。
 
-|スクリプト|説明|
+```sh
+npm run dev
+```
+
+ブラウザで http://localhost:5173 を開くと確認できます。ソースコードを変更すると、自動的に画面へ反映されます。
+
+主なコマンドは次のとおりです。
+
+|コマンド|内容|
 |:---|:---|
-|`npm run dev`|開発サーバ起動(Vite)|
-|`npm run build`|型検査(2 tsconfig)+ 本番ビルド|
-|`npm run preview`|本番ビルドのプレビュー|
-|`npm run test`|テスト実行(Vitest)|
-|`npm run lint`|Biome での静的検査|
-|`npm run lint:fix`|Biome での自動修正|
-|`npm run typecheck`|`tsconfig.json` + `tsconfig.sim.json` の型検査(後者は sim 層の DOM 非依存性を保証)|
-|`npm run depcruise`|dependency-cruiser によるレイヤ境界の強制検査|
-|`npm run calibrate`|シミュレーションのペーシング(満水時間・落下間隔)をヘッドレスで校正|
+|`npm run dev`|開発サーバーを起動します。|
+|`npm run build`|型検査と本番ビルドを実行します。|
+|`npm run test`|テストを実行します。|
+|`npm run lint`|静的検査を実行します。|
+|`npm run typecheck`|型検査を実行します。|
+|`npm run depcruise`|レイヤー間の依存関係を検査します。|
+
+<details>
+<summary>URL パラメータ</summary>
+
+|パラメータ|内容|
+|:---|:---|
+|`seed`|同じ世界を再現するための乱数シードを指定します。|
+|`m=1`|計測オーバーレイを表示します。|
+|`q=0..4`|画質を固定します。0 が最高画質です。|
+|`dpr`|`devicePixelRatio` の上限を指定します。|
+|`sim=stub`|描画確認用のシミュレーションに切り替えます。|
+|`slots`|球体の数を指定します。|
+
+例: http://localhost:5173/?seed=7&m=1
+
+</details>
 
 ## アーキテクチャ
 
-4 層構成。依存方向は dependency-cruiser で機械強制する:
+シミュレーションと描画を分離した 4 層構成です。
 
+```text
+contract/   sim と render をつなぐ型と定数
+sim/        DOM や Three.js に依存しないシミュレーション
+render/     Three.js による描画
+app/        初期化とアプリケーションループ
 ```
-contract/   sim ↔ render の唯一の接点。型と定数のみ、依存ゼロ
-sim/        シミュレーション本体。純ロジック(DOM・three.js 非依存)
-render/     three.js による描画層(three を import できる唯一の場所)
-app/        合成ルート(DI・rAF ループ・URL パラメータ・オーバーレイ)
-```
 
-設計の詳細(裁定の経緯・契約・各層の詳細設計)は [`.claude/plans/`](.claude/plans/) を参照:
-[`master-plan.md`](.claude/plans/master-plan.md)(裁定・フェーズ)/
-[`design-sim.md`](.claude/plans/design-sim.md)(シミュレーション層)/
-[`design-render.md`](.claude/plans/design-render.md)(レンダリング層)。
+依存方向は dependency-cruiser で検査しています。
 
-テストは 205 本(Vitest。sim/render/app/contract の各層を横断)。
-
-### Dependency Graph
+<details>
+<summary>依存関係グラフ</summary>
 
 ![Dependency Graph](dependency-graph.svg)
 
-`npm run dependency-graph` で `dependency-graph.svg` をリポジトリルートに生成する(dependency-cruiser + Graphviz `dot` が必要)。
+`npm run dependency-graph` でグラフを更新できます。実行には Graphviz が必要です。
+
+</details>
 
 ## デプロイ
 
-`npm run build` の出力 `dist/` を任意の静的ホスティングへそのまま配置できる
-(Vite の `base` は常に相対パス — サブパス配下でも資産解決が壊れない)。
-このリポジトリのデモは Cloudflare 上の `https://app.orukubami.sh/mizu-ni-naru/`
-というサブパスに配置している。
+`npm run build` で生成される `dist/` を静的ホスティングへ配置すると動作します。
 
 ## ライセンス
 
-ISC
+[MIT](LICENSE)
