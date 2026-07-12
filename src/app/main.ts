@@ -31,8 +31,8 @@ window.addEventListener('DOMContentLoaded', () => {
     params.sim === 'stub' ? new StubSim() : new MizuNiNaruSim();
   // pacing は SLOT_COUNT_DESKTOP/MOBILE の大小関係に依存した推測(sim 側の
   // フォールバック)に頼らず、app 層が既に持つ正しい isMobile から明示的に
-  // 渡す(A70: SLOT_COUNT_DESKTOP と SLOT_COUNT_MOBILE が同値になったことで
-  // 推測ロジックが機能しなくなったため — master-plan.md A70 参照)。
+  // 渡す(A70: 両定数が将来同値になっても推測ロジックが誤判定しないための
+  // 予防的修正 — master-plan.md A70 参照)。
   sim.init({ seed, slotCount, pacing: isMobile ? 'mobile' : 'desktop' });
 
   // SceneRenderer を具象型で束縛(applyTier は SkyRenderer 契約外の拡張 API —
