@@ -52,8 +52,13 @@ export const emptyPlacement = (): SlotPlacement => ({
  * - R は `R_MIN + (R_NEAR_RING_MAX − R_MIN) · u²`(A42「身の丈ロール」—
  *   近リングは R_MAX より低い R_NEAR_RING_MAX=1.8 が上限。u² シェーピングで
  *   小径寄りに偏る)
+ * - others が完全に空(全 null)の場合(= init 冒頭で最初にロールされる
+ *   スロットのみ該当)は分離チェック不要のため、無ジッターのフォールバック
+ *   基準位置ではなく、ジッター式を1回だけ適用した候補をそのまま採用する
+ *   (A67: 無ジッターのままだと seed によらず座標が固定されてしまうため)
  * - RNG 呼び順(§7.1): R → (角, 半径, y) × 試行 → bob 位相 ×2。
- *   初期 fill ジッターは呼び出し側(init のみ)
+ *   ただし others が完全に空の場合のみ (角, 半径, y) は試行ループなしの
+ *   1 回のみ(A67)。初期 fill ジッターは呼び出し側(init のみ)
  */
 export class SlotRing {
   private readonly innerCount: number;
@@ -85,29 +90,47 @@ export class SlotRing {
       (inner ? 0 : Math.PI / this.outerCount);
     const uR = rng.next();
     const r = R_MIN + (R_NEAR_RING_MAX - R_MIN) * uR * uR;
-    // フォールバック基準: ジッターなし基準位置 + リング別 y(初期比較対象)
-    const p = this.candidate;
-    p.x = ringRadius * Math.cos(theta0);
-    p.y = inner ? FALLBACK_Y_INNER : FALLBACK_Y_OUTER;
-    p.z = ringRadius * Math.sin(theta0);
-    let bestScore = minMargin(p.x, p.y, p.z, r, others);
-    let bestX = p.x;
-    let bestY = p.y;
-    let bestZ = p.z;
-    let solved = bestScore >= 0;
-    for (let t = 0; t < SEPARATION_MAX_TRIES && !solved; t++) {
+    let bestX: number;
+    let bestY: number;
+    let bestZ: number;
+    // others が完全に空(全 null)なら分離チェック対象が存在しない
+    // (= 初期化時にワールドが空の状態で最初にロールされるスロットのみ該当。
+    // A67: このケースに限り無ジッターのフォールバック基準位置を採用せず、
+    // 既存のジッター式を1回だけ適用する — 分離チェックが不要な以上
+    // 早期確定に理由がなく、無ジッターのままだと seed によらず座標が固定
+    // されてしまうため)
+    const hasOthers = others.some((o) => o !== null);
+    if (!hasOthers) {
       const theta = theta0 + (2 * rng.next() - 1) * ANGLE_JITTER;
       const radius = ringRadius + (2 * rng.next() - 1) * RADIAL_JITTER;
-      const cy = RING_Y_MIN + rng.next() * (RING_Y_MAX - RING_Y_MIN);
-      const cx = radius * Math.cos(theta);
-      const cz = radius * Math.sin(theta);
-      const score = minMargin(cx, cy, cz, r, others);
-      if (score > bestScore) {
-        bestScore = score;
-        bestX = cx;
-        bestY = cy;
-        bestZ = cz;
-        solved = score >= 0;
+      bestX = radius * Math.cos(theta);
+      bestY = RING_Y_MIN + rng.next() * (RING_Y_MAX - RING_Y_MIN);
+      bestZ = radius * Math.sin(theta);
+    } else {
+      // フォールバック基準: ジッターなし基準位置 + リング別 y(初期比較対象)
+      const p = this.candidate;
+      p.x = ringRadius * Math.cos(theta0);
+      p.y = inner ? FALLBACK_Y_INNER : FALLBACK_Y_OUTER;
+      p.z = ringRadius * Math.sin(theta0);
+      let bestScore = minMargin(p.x, p.y, p.z, r, others);
+      bestX = p.x;
+      bestY = p.y;
+      bestZ = p.z;
+      let solved = bestScore >= 0;
+      for (let t = 0; t < SEPARATION_MAX_TRIES && !solved; t++) {
+        const theta = theta0 + (2 * rng.next() - 1) * ANGLE_JITTER;
+        const radius = ringRadius + (2 * rng.next() - 1) * RADIAL_JITTER;
+        const cy = RING_Y_MIN + rng.next() * (RING_Y_MAX - RING_Y_MIN);
+        const cx = radius * Math.cos(theta);
+        const cz = radius * Math.sin(theta);
+        const score = minMargin(cx, cy, cz, r, others);
+        if (score > bestScore) {
+          bestScore = score;
+          bestX = cx;
+          bestY = cy;
+          bestZ = cz;
+          solved = score >= 0;
+        }
       }
     }
     out.r = r;

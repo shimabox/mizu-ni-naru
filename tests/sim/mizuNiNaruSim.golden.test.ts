@@ -9,7 +9,7 @@ import { MizuNiNaruSim } from '../../src/sim/MizuNiNaruSim';
  * 主系列: seed=7・slotCount=12 で 1800 step(30 s)回した後の view バッファ
  * 総和チェックサム・SimCounts・累計イベント数を記録値で assert する
  * (高速・決定論の番犬として十分 — 球数を増やしても検知力は変わらない)。
- * 加えて 96 球(A35 構成)× 300 step の短いチェックサムを 1 本だけ追加し、
+ * 加えて 96 球(A35 構成)× 400 step の短いチェックサムを 1 本だけ追加し、
  * desktop スロット構成そのものの回帰を検知する。
  *
  * ⚠ このテストが壊れたら:
@@ -99,7 +99,7 @@ const runGolden = (slotCount: number, steps = 1800): GoldenRecord => {
  * slotCount=96(desktop)から slotCount=12 に切り替えた。これはテスト対象の
  * 挙動が変わったのではなく、テストパラメータ(球数)を変えたことによる
  * 再記録(境界・台帳ロジックの網羅性は球数に依存しないため、12 球で十分)。
- * 96 球構成そのものの回帰検知は下の EXPECTED_SMOKE_96(300 step)が担う。
+ * 96 球構成そのものの回帰検知は下の EXPECTED_SMOKE_96(400 step)が担う。
  * 2026-07-11 再記録(5): A40(F_FULL 0.6→球ごとの一様帯 [0.8,0.9]、
  * VOLUME_GAIN 15→21、INITIAL_FILL_MAX 0.55→0.75 — 「もっと溜まってから
  * 落ちてほしい。0.8〜0.9 とかにできる?」)で落下トリガの fill01 閾値・
@@ -173,49 +173,69 @@ const runGolden = (slotCount: number, steps = 1800): GoldenRecord => {
  * 消費がカスケードして下流値も連鎖的に変化する(再記録(13)と同種の正当な
  * 再記録)。通常再湧き用の RESPAWN_DELAY_MIN_S/MAX_S 自体は無変更
  * (BubbleFsm.ts の通常経路は無改修 — master-plan.md A66 参照)。
+ * 2026-07-12 再記録(15): A67(「最初の1個の描画位置は固定なのか?」という
+ * ユーザー報告への対応 — `SlotRing.rollInto` は others が完全に空〈=
+ * init 冒頭で最初にロールされる index 0 のみ該当〉のとき、分離チェックの
+ * スコアがフォールバック候補〈ジッターなし基準位置〉のまま即座に
+ * solved=true になり、ジッター抽選ループに一切入らずに確定していたため、
+ * INITIAL_VISIBLE_SLOT〈index 0〉の座標が seed によらず常に同一だった)。
+ * others が完全に空の場合に限り、無ジッターのフォールバック候補ではなく
+ * 既存のジッター式(角・半径・y)を1回だけ適用した候補を採用するよう修正
+ * (master-plan.md A67 参照)。others が空でない通常時の分岐・RNG 消費は
+ * 完全に不変。others が空の index 0 のみ `rng.next()` を追加で3回消費する
+ * ため(角・半径・y のジッター — 従来は0回)、init() 以降の全 RNG 消費が
+ * カスケードして下流値も連鎖的に変化する(再記録(13)/(14)と同種の正当な
+ * 再記録)。**96 球スモークのみ追加で steps を 300→400 に変更**: RNG 順
+ * 変化のカスケードにより 300 step 時点で absorbedTotal が偶然 0 になり
+ * (「空虚テスト防止」の `expect(actual.absorbedTotal).toBeGreaterThan(0)`
+ * に抵触)、実測で absorbedTotal は step 350 付近から非ゼロになることを
+ * 確認したため、余裕を持たせて 400 step に変更した(スモーク検知対象の
+ * 96 球構成・境界ロジック自体は無変更 — テストの安定性のためのみの調整)。
+ * 主系列(12 球・1800 step)は steps 変更なし。
  */
 const EXPECTED_MAIN: GoldenRecord = {
-  bubbles: 76.89894763597724,
-  bubblesPrev: 76.90260005329453,
-  atoms: 1489.5400631469674,
-  atomsColor: 705.510784983635,
-  droplets: -96.09867521747947,
-  atomCount: 261,
-  dropletCount: 17,
+  bubbles: 78.75065690946212,
+  bubblesPrev: 78.75164890346787,
+  atoms: 1240.8358199428767,
+  atomsColor: 702.8543144464493,
+  droplets: 17.215838860720396,
+  atomCount: 262,
+  dropletCount: 9,
   splashSum: 1,
-  rippleSum: 309,
-  h: 126,
+  rippleSum: 316,
+  h: 132,
   o: 90,
-  h2: 45,
-  dropletsLive: 17,
+  h2: 40,
+  dropletsLive: 9,
   splashesTotal: 1,
-  absorbedTotal: 89,
-  dissolvedTotal: 21,
-  meanFill01: 0.10223086558341064,
+  absorbedTotal: 104,
+  dissolvedTotal: 15,
+  meanFill01: 0.1199832241376917,
 };
 
 /**
- * 96 球スモーク 記録値(seed=7・slotCount=96・300 step)。A35 構成(近 12 +
- * フィールド 84)そのものの回帰を短時間で検知する。再記録手順は上と同じ。
+ * 96 球スモーク 記録値(seed=7・slotCount=96・400 step)。A35 構成(近 12 +
+ * フィールド 84)そのものの回帰を短時間で検知する。再記録手順は上と同じ
+ * (steps=300→400 に変更した理由は再記録(15)のコメント参照)。
  */
 const EXPECTED_SMOKE_96: GoldenRecord = {
-  bubbles: 630.0529068077449,
-  bubblesPrev: 630.0505991552491,
-  atoms: 10478.090488080052,
-  atomsColor: 4709.681173890829,
-  droplets: 61.84897395595908,
-  atomCount: 1886,
-  dropletCount: 11,
+  bubbles: 641.0690765748732,
+  bubblesPrev: 641.0885231024586,
+  atoms: 11175.275766367093,
+  atomsColor: 4851.094311982393,
+  droplets: -95.49594381451607,
+  atomCount: 1918,
+  dropletCount: 23,
   splashSum: 0,
-  rippleSum: 11,
-  h: 1065,
-  o: 754,
-  h2: 67,
-  dropletsLive: 11,
+  rippleSum: 20,
+  h: 1058,
+  o: 751,
+  h2: 109,
+  dropletsLive: 23,
   splashesTotal: 0,
-  absorbedTotal: 3,
-  dissolvedTotal: 0,
-  meanFill01: 0.008173616150759077,
+  absorbedTotal: 4,
+  dissolvedTotal: 3,
+  meanFill01: 0.008304874061149705,
 };
 
 const assertGolden = (actual: GoldenRecord, expected: GoldenRecord): void => {
@@ -237,8 +257,8 @@ describe('MizuNiNaruSim ゴールデン(seed=7)', () => {
     assertGolden(runGolden(12, 1800), EXPECTED_MAIN);
   });
 
-  it('96 球スモーク(近 12 + フィールド 84・300 step)が記録値と一致する', () => {
-    assertGolden(runGolden(SLOT_COUNT_DESKTOP, 300), EXPECTED_SMOKE_96);
+  it('96 球スモーク(近 12 + フィールド 84・400 step)が記録値と一致する', () => {
+    assertGolden(runGolden(SLOT_COUNT_DESKTOP, 400), EXPECTED_SMOKE_96);
   });
 
   it('2 回実行が同一(同一プロセス内の再現性 — init が完全リセットする)', () => {
