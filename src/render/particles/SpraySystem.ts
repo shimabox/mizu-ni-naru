@@ -60,6 +60,13 @@ const SPLASH_MATCH_DIST_SQ = SPLASH_MATCH_DIST * SPLASH_MATCH_DIST;
  * そのまま踏襲。膜片(kind 1、球ポップ)は A59 でポップした球自身の水色
  * ハッシュに切り替えたため、このフォールバックは使わない(ポップ元の
  * スロット/半径は常に既知なため — ingestPops 参照)。
+ *
+ * 裁定 A61 の実測メモ: このフォールバックの発火率をヘッドレス sim で計測
+ * (seed 7・96 球・8 分相当、実ゲームプレイの高さ帯拡大後 = A56 環境)した
+ * ところ 0/305(0%)— Falling→Splashing 遷移は同一 step 内で完結するため、
+ * resolveSplashTint は常に厳密一致(d²=0)する。再発した「白っぽい/水色が
+ * 混在」の実際の原因はここではなく shaders/spray.ts の film ミックス比率
+ * だった(同ファイルの裁定 A61 コメント参照)。
  */
 const FALLBACK_TINT: readonly [number, number, number] = [0.831, 0.925, 0.949];
 
