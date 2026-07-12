@@ -15,9 +15,12 @@ import {
   BACKDROP_VERTEX_GLSL,
 } from '../shaders/backdrop';
 
-/** 遠景フィールドの個体数(裁定 A41 — 「もっと多くの球体で壮大に」)。 */
-export const BACKDROP_COUNT_DESKTOP = 250;
-export const BACKDROP_COUNT_MOBILE = 100;
+/**
+ * 遠景フィールドの個体数(裁定 A41 で導入 — 「もっと多くの球体で壮大に」。
+ * 裁定 A71 で desktop 250 / mobile 100 → 24/24 統一に合わせて 76/76 に統一)。
+ */
+export const BACKDROP_COUNT_DESKTOP = 76;
+export const BACKDROP_COUNT_MOBILE = 76;
 /**
  * インスタンス用頂点属性バッファの確保サイズ(A69)。
  * desktop/mobile どちらの値が大きくても取りこぼさないよう、
@@ -44,13 +47,17 @@ const COUNT_FRACTION_BY_TIER: readonly number[] = [1.0, 1.0, 1.0, 0.6, 0.3];
  * ハッシュから毎フレーム閉形式で導出する(状態を持たない = 巻き戻し可能、
  * JS 側のアップロードは構築時 1 回のみ)。
  *
- * インスタンス数は desktop 250 / mobile 100(A41)を、固定バッファ desktop 個ぶん
- * ではなく両者の大きい方(`BACKDROP_COUNT_BUFFER`、A69)ぶん確保し、
- * `geometry.instanceCount` だけを毎フレーム安く切り替える
+ * インスタンス数は desktop 250 / mobile 100(A41)だったが、裁定 A71 で
+ * 76/76 に統一。固定バッファは desktop 個ぶんではなく両者の大きい方
+ * (`BACKDROP_COUNT_BUFFER`、A69 — A71 以降は両者が同値のためどちらでも同じ)
+ * ぶん確保し、`geometry.instanceCount` だけを毎フレーム安く切り替える
  * (SkyRenderView に slotCount が無いため `bubbles.count` から
  * MizuNiNaruSim と同じ判定式で mobile/desktop を推定 — §7.1 のパシング
- * 判定と同型)。頂点シェーダの `uCount` も同じ値を渡し、間引いても
- * 半径帯 [40,180] 全域に薄く広がる螺旋配置を保つ。
+ * 判定と同型。A71 で desktop/mobile の値が同数になったためこの推定の
+ * 結果はどちらに転んでも同じ 76 に解決される — A70 で懸念された「推測
+ * ロジックの誤判定」は実害が無い状態になっている)。頂点シェーダの
+ * `uCount` も同じ値を渡し、間引いても半径帯 [40,180] 全域に薄く広がる
+ * 螺旋配置を保つ。
  *
  * 1 material・1 mesh・1 draw(A35 の draw call 予算 ≤20 内、追加 ≤2 の枠に収まる)。
  * 前面のみの軽量αブレンド(BubbleGlassSystem のような back/front 2 パスは
@@ -110,7 +117,7 @@ export class BackdropBubbles implements RenderSystem {
       view.bubbles.count <= SLOT_COUNT_MOBILE
         ? BACKDROP_COUNT_MOBILE
         : BACKDROP_COUNT_DESKTOP;
-    // backdropCount ノブ(Phase 4): ティアで比率を落とす(250→150→75 等)
+    // backdropCount ノブ(Phase 4): ティアで比率を落とす(A71 以降は 76→45→22 等)
     const count = Math.max(0, Math.floor(base * this.countFraction));
     this.geometry.instanceCount = count;
     this.material.uniforms.uCount.value = count;

@@ -110,8 +110,10 @@ export const RING_Y_MAX = 9.0;
 
 /**
  * 近リングの総スロット数(A30 以降不変: SlotRing はこのスロット数分だけ従来の
- * 緩い二重リングを使う)。desktop 96 = 近 12 + 外側フィールド 84(A35)、
- * mobile 24 = 近 7 + フィールド 17(A35)。
+ * 緩い二重リングを使う)。A35 時点は desktop 96 = 近 12 + 外側フィールド 84、
+ * mobile 24 = 近 7 + フィールド 17 だったが、A71 で SLOT_COUNT_DESKTOP を
+ * 24 に統一したため現在は desktop 24 = 近 12 + フィールド 12、
+ * mobile 24 = 近 7 + フィールド 17 のまま(NEAR_RING_COUNT 自体は不変)。
  */
 export const NEAR_RING_COUNT_DESKTOP = 12;
 export const NEAR_RING_COUNT_MOBILE = 7;

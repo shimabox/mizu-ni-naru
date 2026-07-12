@@ -10,14 +10,18 @@ import { MizuNiNaruSim } from '../../src/sim/MizuNiNaruSim';
  * 主系列: seed=7・slotCount=12 で 1800 step(30 s)回した後の view バッファ
  * 総和チェックサム・SimCounts・累計イベント数を記録値で assert する
  * (高速・決定論の番犬として十分 — 球数を増やしても検知力は変わらない)。
- * 加えて 96 球(A35 構成)× 400 step の短いチェックサムを 1 本だけ追加し、
- * desktop スロット構成そのものの回帰を検知する。**A70 でこの呼び出しは
- * `pacing: 'desktop'` を明示指定するよう変更した** — SLOT_COUNT_DESKTOP=96
- * の間は `slotCount <= SLOT_COUNT_MOBILE` のフォールバック推測でも desktop
- * に倒れるため今回のチェックサムへの影響はないが、desktop/mobile の
- * スロット数を将来揃える変更(別タスク)が入っても desktop pacing 経路
- * (A65〜A68 の段階湧き含む)のテストカバレッジが失われないための予防線
- * (詳細は master-plan.md A70 参照)。
+ * 加えて slotCount=SLOT_COUNT_DESKTOP(A71 時点で 24)× 400 step の短い
+ * チェックサムを 1 本だけ追加し、desktop スロット構成・desktop pacing 経路
+ * そのものの回帰を検知する(定数名 `EXPECTED_SMOKE_DESKTOP` は元
+ * `EXPECTED_SMOKE_96` — A35 時点は SLOT_COUNT_DESKTOP=96 だったが A71 で
+ * 24 に変わったため実態に合わせて改称した)。**A70 でこの呼び出しは
+ * `pacing: 'desktop'` を明示指定するよう変更した** — A70 時点は
+ * SLOT_COUNT_DESKTOP=96 > SLOT_COUNT_MOBILE=24 のため `slotCount <=
+ * SLOT_COUNT_MOBILE` のフォールバック推測でも desktop に倒れて実害は
+ * 無かったが、A71 で両定数が 24 に揃った今、明示指定していなければこの
+ * フォールバックは mobile に誤判定していたはずで、desktop pacing 経路
+ * (A65〜A68 の段階湧き含む)のテストカバレッジが失われるところだった
+ * (詳細は master-plan.md A70/A71 参照)。
  *
  * ⚠ このテストが壊れたら:
  * 1. まず RNG 呼び順規約(src/sim/chem/AtomFactory.ts の doc)からの
@@ -110,7 +114,8 @@ const runGolden = (
  * slotCount=96(desktop)から slotCount=12 に切り替えた。これはテスト対象の
  * 挙動が変わったのではなく、テストパラメータ(球数)を変えたことによる
  * 再記録(境界・台帳ロジックの網羅性は球数に依存しないため、12 球で十分)。
- * 96 球構成そのものの回帰検知は下の EXPECTED_SMOKE_96(400 step)が担う。
+ * 96 球構成そのものの回帰検知は下の EXPECTED_SMOKE_DESKTOP(当時の変数名
+ * EXPECTED_SMOKE_96、400 step)が担う(A71 で球数は 24 に変更 — 後述)。
  * 2026-07-11 再記録(5): A40(F_FULL 0.6→球ごとの一様帯 [0.8,0.9]、
  * VOLUME_GAIN 15→21、INITIAL_FILL_MAX 0.55→0.75 — 「もっと溜まってから
  * 落ちてほしい。0.8〜0.9 とかにできる?」)で落下トリガの fill01 閾値・
@@ -225,6 +230,17 @@ const runGolden = (
  * mobile)と同じ 'desktop' に解決され、RNG 消費順・下流値は完全に不変
  * (実測で EXPECTED_SMOKE_96 がビット単位で一致することを確認済み — 再記録
  * 不要)。詳細は master-plan.md A70 参照。
+ * 2026-07-12 再記録(17): A71(SLOT_COUNT_DESKTOP を 96→24 に統一 —
+ * SLOT_COUNT_MOBILE と同値化。A70 で main.ts が pacing を明示的に渡すよう
+ * 修正済みだったため、大小関係に依存した pacing 推測ロジックの脆弱性を
+ * 心配せず安全に実施できた)。このスモークテストは `SLOT_COUNT_DESKTOP` を
+ * 直接参照しているため球数が 96→24 に自動的に変わり、スロット数・配置の
+ * RNG 消費が根本的に変わったため(変更管理手順に基づく再記録)。定数名を
+ * `EXPECTED_SMOKE_96` → `EXPECTED_SMOKE_DESKTOP` に改称(実体が 96 球ではなく
+ * なったため)。desktop pacing 経路(A65〜A68 の段階湧き含む)は 24 球構成
+ * (近リング 12 + 外側フィールド 12)でも正しく機能することを実測で確認済み
+ * (詳細は master-plan.md A71 参照)。主系列(12 球・mobile pacing)は
+ * SLOT_COUNT_DESKTOP を参照しないため無変更・ビット単位で一致を確認済み。
  */
 const EXPECTED_MAIN: GoldenRecord = {
   bubbles: 96.21230888972059,
@@ -247,28 +263,32 @@ const EXPECTED_MAIN: GoldenRecord = {
 };
 
 /**
- * 96 球スモーク 記録値(seed=7・slotCount=96・400 step)。A35 構成(近 12 +
- * フィールド 84)そのものの回帰を短時間で検知する。再記録手順は上と同じ
- * (steps=300→400 に変更した理由は再記録(15)のコメント参照)。
+ * desktop スモーク 記録値(seed=7・slotCount=SLOT_COUNT_DESKTOP・400 step)。
+ * 変数名は歴史的名称 `EXPECTED_SMOKE_96`(A35 構成: 96 球 = 近 12 +
+ * フィールド 84)の名残だが、A71 で SLOT_COUNT_DESKTOP=24 に変わったため
+ * 実体は 24 球構成(近 12 + フィールド 12)— `EXPECTED_SMOKE_DESKTOP` に改称。
+ * desktop スロット構成・desktop pacing 経路そのものの回帰を短時間で検知する。
+ * 再記録手順は上と同じ(steps=300→400 に変更した理由は再記録(15)のコメント
+ * 参照)。
  */
-const EXPECTED_SMOKE_96: GoldenRecord = {
-  bubbles: 641.0690765748732,
-  bubblesPrev: 641.0885231024586,
-  atoms: 11175.275766367093,
-  atomsColor: 4851.094311982393,
-  droplets: -95.49594381451607,
-  atomCount: 1918,
-  dropletCount: 23,
+const EXPECTED_SMOKE_DESKTOP: GoldenRecord = {
+  bubbles: 215.02482321823481,
+  bubblesPrev: 215.02533985144692,
+  atoms: 3518.7492716303677,
+  atomsColor: 1209.1105877757072,
+  droplets: 71.67945517599583,
+  atomCount: 468,
+  dropletCount: 7,
   splashSum: 0,
-  rippleSum: 20,
-  h: 1058,
-  o: 751,
-  h2: 109,
-  dropletsLive: 23,
+  rippleSum: 17,
+  h: 248,
+  o: 182,
+  h2: 38,
+  dropletsLive: 7,
   splashesTotal: 0,
-  absorbedTotal: 4,
-  dissolvedTotal: 3,
-  meanFill01: 0.008304874061149705,
+  absorbedTotal: 6,
+  dissolvedTotal: 0,
+  meanFill01: 0.03325562619984302,
 };
 
 const assertGolden = (actual: GoldenRecord, expected: GoldenRecord): void => {
@@ -290,12 +310,14 @@ describe('MizuNiNaruSim ゴールデン(seed=7)', () => {
     assertGolden(runGolden(12, 1800), EXPECTED_MAIN);
   });
 
-  it('96 球スモーク(近 12 + フィールド 84・400 step)が記録値と一致する', () => {
+  it('desktop スモーク(近 12 + フィールド 12・400 step)が記録値と一致する', () => {
     // A70: pacing を明示指定(desktop pacing 経路のカバレッジをスロット数の
-    // 大小関係に依存させないための予防線 — 上のファイル doc コメント参照)
+    // 大小関係に依存させないための予防線 — 上のファイル doc コメント参照)。
+    // A71 で SLOT_COUNT_DESKTOP=24 になったため実際に球数=24 で走る
+    // (定数名 EXPECTED_SMOKE_DESKTOP は元 EXPECTED_SMOKE_96 — 上のコメント参照)
     assertGolden(
       runGolden(SLOT_COUNT_DESKTOP, 400, 'desktop'),
-      EXPECTED_SMOKE_96,
+      EXPECTED_SMOKE_DESKTOP,
     );
   });
 

@@ -44,7 +44,7 @@ describe('WorldSpec(凍結契約 — master-plan §5 の確定形)', () => {
     expect(STEP_HZ).toBe(60);
     expect(DT).toBe(1 / 60);
     expect(MAX_STEPS_PER_FRAME).toBe(3);
-    expect(SLOT_COUNT_DESKTOP).toBe(96);
+    expect(SLOT_COUNT_DESKTOP).toBe(24);
     expect(SLOT_COUNT_MOBILE).toBe(24);
     expect(BUBBLE_CAPACITY).toBeGreaterThanOrEqual(SLOT_COUNT_DESKTOP);
   });
