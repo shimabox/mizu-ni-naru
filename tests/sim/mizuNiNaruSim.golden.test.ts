@@ -146,13 +146,19 @@ const runGolden = (slotCount: number, steps = 1800): GoldenRecord => {
  * 同じ理由(アンカー y のロール範囲のみ変化、RNG 呼び順・消費回数は完全に
  * 不変)により bubbles/bubblesPrev/atoms/droplets の位置チェックサムのみ
  * 再度変化。他フィールドはビット単位で不変(再確認)。
+ * 2026-07-12 再記録(12): A63(RING_Y_MAX を 7.5→9.0 に復元 — A62 の縮小が
+ * ファセット再現に効果を示せなかったため、ユーザー指示で A56 相当に戻した)。
+ * config.ts が A56 と完全に同じ値に戻ったため、位置チェックサム
+ * (bubbles/bubblesPrev/atoms/droplets)は再記録(10)(A56 時点)の値と
+ * ビット単位で一致(RNG 呼び順・消費回数は不変のまま出力範囲が戻っただけ)。
+ * 他フィールドは再記録(11)から変化なし。
  */
 const EXPECTED_MAIN: GoldenRecord = {
-  bubbles: 81.5044176296824,
-  bubblesPrev: 81.35850631173525,
-  atoms: 736.8630127198994,
+  bubbles: 90.50441667600808,
+  bubblesPrev: 90.35850535806094,
+  atoms: 885.3630117662251,
   atomsColor: 480.45333328843117,
-  droplets: 32.78948927670717,
+  droplets: 40.28948927670717,
   atomCount: 177,
   dropletCount: 8,
   splashSum: 3,
@@ -172,11 +178,11 @@ const EXPECTED_MAIN: GoldenRecord = {
  * フィールド 84)そのものの回帰を短時間で検知する。再記録手順は上と同じ。
  */
 const EXPECTED_SMOKE_96: GoldenRecord = {
-  bubbles: 705.6683503976092,
-  bubblesPrev: 705.6803325461224,
-  atoms: 8875.789283473976,
+  bubbles: 777.7412919392809,
+  bubblesPrev: 777.7532721804455,
+  atoms: 10201.48763914872,
   atomsColor: 4550.16019564867,
-  droplets: 19.076557964086533,
+  droplets: 40.07655939459801,
   atomCount: 1764,
   dropletCount: 23,
   splashSum: 0,
