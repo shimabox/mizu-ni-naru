@@ -192,25 +192,37 @@ const runGolden = (slotCount: number, steps = 1800): GoldenRecord => {
  * 確認したため、余裕を持たせて 400 step に変更した(スモーク検知対象の
  * 96 球構成・境界ロジック自体は無変更 — テストの安定性のためのみの調整)。
  * 主系列(12 球・1800 step)は steps 変更なし。
+ * 2026-07-12 再記録(16): A68(初期段階湧きを desktop 限定にし、mobile は
+ * 従来の全実球同時 Spawning に戻す — 「スマホの場合は今まで通りにしたい」
+ * ユーザー要望への対応)。主系列は slotCount=12(≤ SLOT_COUNT_MOBILE=24)=
+ * mobile 扱いのため、init() の A65〜A66 段階湧きループ(Dead 化 +
+ * deadDurationSteps ロール)がまるごとスキップされるようになった
+ * (`pacing === 'desktop'` の分岐外)。これにより主系列の RNG 消費順は
+ * 再記録(13)以前(A65 導入前)の状態に戻り、下流の全値が連鎖的に変化する
+ * (再記録(13)/(14)/(15)と同種・逆方向の正当な再記録)。**A67(index 0 の
+ * ジッター修正)は mobile でも引き続き有効**(others が空の状態で最初に
+ * ロールされるのは mobile でも index 0 のままのため)。96 球スモーク
+ * (desktop 扱い)は A68 の分岐条件により従来どおり段階湧きループが実行され、
+ * 数値上ビット単位で不変(実測で再確認済み)。
  */
 const EXPECTED_MAIN: GoldenRecord = {
-  bubbles: 78.75065690946212,
-  bubblesPrev: 78.75164890346787,
-  atoms: 1240.8358199428767,
-  atomsColor: 702.8543144464493,
-  droplets: 17.215838860720396,
-  atomCount: 262,
-  dropletCount: 9,
-  splashSum: 1,
-  rippleSum: 316,
-  h: 132,
-  o: 90,
-  h2: 40,
-  dropletsLive: 9,
-  splashesTotal: 1,
-  absorbedTotal: 104,
-  dissolvedTotal: 15,
-  meanFill01: 0.1199832241376917,
+  bubbles: 96.21230888972059,
+  bubblesPrev: 96.0938917658641,
+  atoms: 764.317950990051,
+  atomsColor: 454.5858820974827,
+  droplets: 67.49942880123854,
+  atomCount: 178,
+  dropletCount: 5,
+  splashSum: 2,
+  rippleSum: 725,
+  h: 99,
+  o: 63,
+  h2: 16,
+  dropletsLive: 5,
+  splashesTotal: 2,
+  absorbedTotal: 160,
+  dissolvedTotal: 57,
+  meanFill01: 0.4849848308525316,
 };
 
 /**

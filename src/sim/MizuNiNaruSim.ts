@@ -192,18 +192,22 @@ export class MizuNiNaruSim implements SimLike {
     // (0〜3 s)を使う — 通常再湧きの RESPAWN_DELAY_MIN_S/MAX_S(4〜10 s)を
     // そのまま初期化に流用すると最初の画面が最大 10 s 近く実球 1 個だけに
     // なり寂しく見えるため、初期化専用の短いバースト窓に差し替える。
-    const INITIAL_VISIBLE_SLOT = 0;
-    for (let i = 0; i < this.slotCount; i++) {
-      if (i === INITIAL_VISIBLE_SLOT) continue;
-      const slot = this.slots[i];
-      const deadDurationSteps = Math.round(
-        (INITIAL_SPAWN_STAGGER_MIN_S +
-          this.rng.next() *
-            (INITIAL_SPAWN_STAGGER_MAX_S - INITIAL_SPAWN_STAGGER_MIN_S)) *
-          STEP_HZ,
-      );
-      slot.fsm.enterDead(deadDurationSteps);
-      slot.world.drainWater();
+    // A68: mobile はこの段階湧き演出を適用せず、従来どおり全実球が t=0 で
+    // 一斉に Spawning する(段階湧きは desktop 限定)。
+    if (pacing === 'desktop') {
+      const INITIAL_VISIBLE_SLOT = 0;
+      for (let i = 0; i < this.slotCount; i++) {
+        if (i === INITIAL_VISIBLE_SLOT) continue;
+        const slot = this.slots[i];
+        const deadDurationSteps = Math.round(
+          (INITIAL_SPAWN_STAGGER_MIN_S +
+            this.rng.next() *
+              (INITIAL_SPAWN_STAGGER_MAX_S - INITIAL_SPAWN_STAGGER_MIN_S)) *
+            STEP_HZ,
+        );
+        slot.fsm.enterDead(deadDurationSteps);
+        slot.world.drainWater();
+      }
     }
     this.packSlots();
   }
