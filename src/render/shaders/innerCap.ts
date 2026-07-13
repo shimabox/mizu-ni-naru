@@ -23,7 +23,7 @@ export { RIPPLES_PER_BUBBLE, RIPPLE_NEAR_COUNT };
  * capR = √(Rv² − wl²)(頂点シェーダ内で導出 — CPU 前処理なし)。
  * 頂点は緩い揺れのみ(Straining は wobble 連動 ×1.8 — A45)。フラグメント法線は
  * InnerRippleView 由来の解析リング波(uniform リングバッファ、カメラ近傍
- * 12 球 × 6 本 — A32)。縁はメニスカス帯(§3)と同じ #007fff 発光で滑らかに
+ * RIPPLE_NEAR_COUNT 球 × 6 本 — A32、球数は A74 で SLOT_COUNT から導出)。縁はメニスカス帯(§3)と同じ #007fff 発光で滑らかに
  * 接続する。本体は体積(innerWater)と同じ濃い青と地続きに見えるよう白い
  * スペキュラ/空反射を抑制(A31 — 境目で色が跳ねない)。
  */
@@ -78,7 +78,7 @@ precision highp float;
 ${SKY_UNIFORMS_GLSL}
 uniform float uStepF;
 uniform vec3 uSssColor;
-uniform vec4 uInnerRipples[${RIPPLE_NEAR_COUNT * RIPPLES_PER_BUBBLE}];  // [x, z, birthStepF, strength] × 近傍 12 球 × 6 本(A32)
+uniform vec4 uInnerRipples[${RIPPLE_NEAR_COUNT * RIPPLES_PER_BUBBLE}];  // [x, z, birthStepF, strength] × 近傍 RIPPLE_NEAR_COUNT 球 × 6 本(A32、球数は A74 で SLOT_COUNT から導出)
 varying vec3 vWorldPos;
 varying vec2 vCapLocal;
 varying float vRadial;
@@ -92,7 +92,7 @@ const vec3 MIZU_DEEP = vec3(0.0, 0.030, 0.160);
 
 void main() {
   // InnerRipple: 解析リング波の法線摂動(§4b — 伝播 0.9 u/s・減衰 1.8/s)。
-  // カメラ近傍 12 球のみ追跡(A32) — 対象外(vSlot<0)は微波のみ
+  // カメラ近傍 RIPPLE_NEAR_COUNT 球のみ追跡(A32、球数は A74 で SLOT_COUNT から導出) — 対象外(vSlot<0)は微波のみ
   vec3 n = vec3(0.0, 1.0, 0.0);
   if (vSlot >= 0.0) {
     int base = int(vSlot + 0.5) * 6;

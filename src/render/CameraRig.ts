@@ -175,7 +175,17 @@ export class CameraRig {
     // 「海+数球」が窮屈にならない構図にする(全リング収容は非目標のまま)
     const pb = this.portraitBlend;
     const azimuth = (TWO_PI * t) / 240;
-    const radius = (13.2 + 1.0 * Math.sin((TWO_PI * t) / 97)) * (1 - 0.42 * pb);
+    // 距離(ズーム相当)は周期の異なる2波の合成(周期37s・23s、非整数比)で
+    // ビート(うなり)を作り、山と山が重なる時だけ「グッと寄る/離れる」
+    // はっきりした起伏を生む一方、打ち消し合う時間帯は穏やかな呼吸に戻る
+    // (裁定 A75 — A73 の単一 sin 振幅拡大だけでは単調な呼吸のままだった
+    // というフィードバックを受けた対処)。振幅合計 2.3+1.2=3.5(基準13.2の
+    // ≈26.5%)は、DIST_MIN/DIST_MAX クランプに張り付かない範囲で検算済み
+    const radius =
+      (13.2 +
+        2.3 * Math.sin((TWO_PI * t) / 37) +
+        1.2 * Math.sin((TWO_PI * t) / 23 + 0.9)) *
+      (1 - 0.42 * pb);
     const height =
       (5.4 + 0.7 * Math.sin((TWO_PI * t) / 61 + 1.3)) * (1 - 0.3 * pb);
     this.target.set(

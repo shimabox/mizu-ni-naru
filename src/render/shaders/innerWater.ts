@@ -1,4 +1,8 @@
 import {
+  SLOT_COUNT_DESKTOP,
+  SLOT_COUNT_MOBILE,
+} from '../../contract/WorldSpec';
+import {
   BUBBLE_INSTANCE_VERTEX_PARS_GLSL,
   MIZU_BLUE_GLSL,
   WATER_TINT_GLSL,
@@ -8,12 +12,21 @@ import {
 export const RIPPLES_PER_BUBBLE = 6;
 
 /**
- * InnerRipple uniform を張る球数(裁定 A32 — 「カメラ近傍 12 球のみ」)。
- * BubbleInstanceBuffers.sync() がカメラ距離で毎フレーム選抜し、
- * aMisc.x(vSlot)を 0..RIPPLE_NEAR_COUNT-1 のインデックスとして詰め替える
- * (対象外の遠方球は vSlot=-1 でキャップ/体積の波紋ループをスキップ — 微波のみ)。
+ * InnerRipple uniform を張る球数(裁定 A32 で導入した「カメラ近傍のみ」選抜。
+ * 当時は 96/24 球中の 12 球という部分選抜だったが、裁定 A71 で球数が
+ * 24/24 に統一された結果、12 決め打ちのままだと常に半数が波紋描画対象外になり
+ * 「波紋が出るときと出ないときがある」不具合として現れた(ユーザー報告)。
+ * BackdropBubbles.ts の BACKDROP_COUNT_BUFFER(A69)と同じ考え方で、決め打ちを
+ * やめ SLOT_COUNT_DESKTOP/MOBILE の大きい方から導出する(裁定 A74)。
+ * 現在は両者とも 24 のため全球が対象になる。BubbleInstanceBuffers.sync() が
+ * カメラ距離で毎フレーム選抜し、aMisc.x(vSlot)を 0..RIPPLE_NEAR_COUNT-1 の
+ * インデックスとして詰め替える(対象外の球があれば vSlot=-1 でキャップ/体積の
+ * 波紋ループをスキップ — 微波のみ)。
  */
-export const RIPPLE_NEAR_COUNT = 12;
+export const RIPPLE_NEAR_COUNT = Math.max(
+  SLOT_COUNT_DESKTOP,
+  SLOT_COUNT_MOBILE,
+);
 
 /**
  * 球内の水 — 体積パス(design-render §4a)。
@@ -31,7 +44,9 @@ export const WATER_VISUAL_RATIO = 0.985;
 export const BUBBLE_STATE_TRANSFORM_GLSL = /* glsl */ `
 // state 駆動の変形係数(§3)— grow / stretchY / alive / wobbleGain を返す
 vec4 bubbleTransform(float state, float prog) {
-  float grow = (state == 0.0) ? 0.6 + 0.5 * prog - 0.1 * sin(prog * 9.0) : 1.0;
+  // Spawning: スケールイン(A72: smoothstep で単調増加・Drifting の 1.0 に連続着地)
+  float growEase = prog * prog * (3.0 - 2.0 * prog);
+  float grow = (state == 0.0) ? 0.6 + 0.4 * growEase : 1.0;
   // A45: Straining の予兆 stretch ランプを ~4 割に縮小(0.10→0.04 — A29 は不変)
   float strain = (state == 2.0) ? prog : 0.0;
   // Falling: 落下開始 ≈0.5 s で張り(+0.10)を解き +0.04 の空力感のみ残す(A29)
@@ -91,7 +106,7 @@ uniform sampler2D uNoise;
 uniform float uTimeSec;
 uniform float uStepF;
 uniform vec3 uSssColor;
-uniform vec4 uInnerRipples[${RIPPLE_NEAR_COUNT * RIPPLES_PER_BUBBLE}];  // [x, z, birthStepF, strength] × 近傍 12 球 × 6 本(A32/A43 — キャップと同一配列を共有)
+uniform vec4 uInnerRipples[${RIPPLE_NEAR_COUNT * RIPPLES_PER_BUBBLE}];  // [x, z, birthStepF, strength] × 近傍 RIPPLE_NEAR_COUNT 球 × 6 本(A32/A43、球数は A74 で SLOT_COUNT から導出 — キャップと同一配列を共有)
 varying vec3 vWorldPos;
 varying vec3 vCenter;
 varying vec3 vLocalPos;

@@ -78,8 +78,9 @@ void main() {
   float seed = aMisc.y;
 
   vec3 p = position;               // 単位球 = 法線
-  // Spawning: スケールイン(弾性オーバーシュート)
-  float grow = (state == 0.0) ? 0.6 + 0.5 * prog - 0.1 * sin(prog * 9.0) : 1.0;
+  // Spawning: スケールイン(A72: smoothstep で単調増加・Drifting の 1.0 に連続着地)
+  float growEase = prog * prog * (3.0 - 2.0 * prog);
+  float grow = (state == 0.0) ? 0.6 + 0.4 * growEase : 1.0;
   // Straining: 縦呼吸(張りの予兆)。Falling: 落下開始 ≈0.5 s で張り(+0.10)を
   // 解き、微小な空力ストレッチ(+0.04)だけ残して剛体的にまっすぐ落ちる(A29)
   // A45: Straining の予兆 stretch ランプを ~4 割に縮小(0.10→0.04 — A29 は不変)

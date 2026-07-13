@@ -280,7 +280,7 @@ export class InnerWaterSystem implements RenderSystem {
       const slot = ripples.data[o];
       if (slot < 0 || slot >= BUBBLE_CAPACITY) continue;
       const rIdx = rippleIndexBySlot[slot];
-      if (rIdx < 0) continue; // 遠方球(カメラ近傍 12 球の対象外)は微波のみ(A32)
+      if (rIdx < 0) continue; // 遠方球(カメラ近傍 RIPPLE_NEAR_COUNT 球の対象外)は微波のみ(A32、球数は A74 で SLOT_COUNT から導出)
       const cursor = this.rippleCursor[rIdx];
       this.rippleUniform[rIdx * RIPPLES_PER_BUBBLE + cursor].set(
         ripples.data[o + 1], // localX(球ローカル世界単位 — A8)
