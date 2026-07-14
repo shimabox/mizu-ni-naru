@@ -443,6 +443,8 @@ shaderのループ上限とCPU選抜は `MAX_REFLECT_BUBBLES = 8` なのに、un
 
 ## 4.1 hot pathの小さなアロケーションをゼロへ寄せる
 
+部分実装済み: `AggregatePacker`のsubarray view除去は`6e95dc1`。正式結果は[`performance-results/20260714-packer-subarray.md`](performance-results/20260714-packer-subarray.md)を参照。他のhot pathアロケーションは未実装。
+
 対象:
 
 - `src/sim/view/AggregatePacker.ts`
@@ -457,7 +459,7 @@ shaderのループ上限とCPU選抜は `MAX_REFLECT_BUBBLES = 8` なのに、un
 
 `AggregatePacker.pack`は球ごとに最大3回、8要素コピーのための`subarray` viewを作る。
 
-24球 × 3 view × 60 step = 4,320 TypedArray view/秒。
+24球 × 2 view × 60 step = 2,880 TypedArray view/秒。
 
 8要素なら添字ループまたは手動unrollで十分である。24,000,000コピーの合成ベンチでは次の結果だった。
 
