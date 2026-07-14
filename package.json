@@ -13,7 +13,13 @@
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.sim.json",
     "depcruise": "depcruise src --config .dependency-cruiser.cjs",
     "dependency-graph": "depcruise src --config .dependency-cruiser.cjs --include-only \"^src\" --output-type dot | dot -T svg > dependency-graph.svg",
-    "calibrate": "tsx scripts/calibrate.mts"
+    "calibrate": "tsx scripts/calibrate.mts",
+    "bench:sim": "tsx scripts/benchmark-sim.mts",
+    "profile:sim": "tsx scripts/profile-sim.mts",
+    "bench:detectors": "tsx scripts/benchmark-detectors.mts",
+    "verify:detectors": "tsx scripts/verify-detector-compat.mts",
+    "bench:uploads": "tsx scripts/benchmark-attribute-uploads.mts",
+    "bench:browser": "npm run build && tsx scripts/benchmark-browser.mts"
   },
   "keywords": [],
   "author": "",

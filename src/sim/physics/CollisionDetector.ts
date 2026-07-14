@@ -2,8 +2,8 @@ import type { Atom } from '../chem/Atom';
 
 /**
  * 衝突検出の DI 点(知見: Mizu-ts/src/physics/CollisionDetector.ts)。
- * GridDetector が既定、BruteForceDetector はテストオラクルとして常備
- * (design-sim §3.4 — grid vs 総当たりのプロパティテストが品質アンカー)。
+ * OrderedDirectDetector が既定、GridDetector は列挙順の参照実装、
+ * BruteForceDetector はペア集合のテストオラクルとして常備する。
  *
  * 検出は純幾何(中心距離 < r_i + r_j)。反応可能ペアかどうかの判別は
  * ReactionRegistry のルックアップが担う(全 kind が反応系に属する本作では

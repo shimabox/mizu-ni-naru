@@ -107,6 +107,11 @@ app/        初期化とアプリケーションループ
 
 `npm run build` で生成される `dist/` を静的ホスティングへ配置すると動作します。
 
+## 開発ドキュメント
+
+- [パフォーマンス計測ツールの使い方](docs/performance/README.md)
+- [設計・計測・検証の作業ログ](docs/README.md)
+
 ## ライセンス
 
 [MIT](LICENSE)

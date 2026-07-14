@@ -9,26 +9,33 @@ describe('parseUrlParams', () => {
     expect(p.measure).toBe(false);
     expect(p.q).toBeUndefined();
     expect(p.dpr).toBeUndefined();
+    expect(p.probe).toBe(false);
     expect(p.sim).toBeUndefined();
     expect(p.slots).toBeUndefined();
   });
 
   it('正常値をパースする', () => {
-    const p = parseUrlParams('?seed=7&m=1&q=2&dpr=1.5&sim=stub&slots=5');
+    const p = parseUrlParams(
+      '?seed=7&m=1&q=2&dpr=1.5&probe=1&sim=stub&slots=5',
+    );
     expect(p.seed).toBe(7);
     expect(p.measure).toBe(true);
     expect(p.q).toBe(2);
     expect(p.dpr).toBe(1.5);
+    expect(p.probe).toBe(true);
     expect(p.sim).toBe('stub');
     expect(p.slots).toBe(5);
   });
 
   it('不正値は undefined に落とす(数値ガード)', () => {
-    const p = parseUrlParams('?seed=abc&m=2&q=9&dpr=-1&sim=real&slots=0');
+    const p = parseUrlParams(
+      '?seed=abc&m=2&q=9&dpr=-1&probe=2&sim=real&slots=0',
+    );
     expect(p.seed).toBeUndefined();
     expect(p.measure).toBe(false);
     expect(p.q).toBeUndefined();
     expect(p.dpr).toBeUndefined();
+    expect(p.probe).toBe(false);
     expect(p.sim).toBeUndefined();
     expect(p.slots).toBeUndefined();
   });

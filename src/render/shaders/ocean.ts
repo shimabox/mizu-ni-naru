@@ -1,12 +1,11 @@
-import { BUBBLE_CAPACITY } from '../../contract/WorldSpec';
 import { GERSTNER_CHUNK_GLSL, GERSTNER_UNIFORMS_GLSL } from './gerstner';
 import { IRID_CHUNK_GLSL, MIZU_BLUE_GLSL } from './glass';
 import { SKY_CHUNK_GLSL, SKY_UNIFORMS_GLSL } from './sky';
 
 /**
- * 解析反射に参加する球の上限(A30、A35 でも不変)。容量(BUBBLE_CAPACITY)は
- * 128 だが描画コスト維持のため CPU がカメラに近い 8 球を毎フレーム選抜して
- * 詰める(OceanSystem.packBubbles)。
+ * 解析反射に参加する球の上限(A30、A35 でも不変)。世界の容量は128だが、
+ * 描画コスト維持のためCPUがカメラに近い8球を毎フレーム選抜して詰める
+ * (OceanSystem.packBubbles)。uniform配列も実際に参照するこの上限だけ確保する。
  */
 export const MAX_REFLECT_BUBBLES = 8;
 
@@ -98,9 +97,9 @@ uniform vec3 uSssColor;    // #2fc0a8 ターコイズ
 uniform vec3 uFoamColor;   // #e2eef2(A38 — 純白は「光」と誤読されるため淡水色)
 
 #ifdef ANALYTIC_REFLECTIONS
-// 配列は BUBBLE_CAPACITY(16)だが、詰められるのはカメラ近傍 ≤8 球(A30)
-uniform vec4 uBubblePosR[${BUBBLE_CAPACITY}];  // [cx, cy, cz, R_visual](補間 + 状態変形済み)
-uniform vec4 uBubbleMisc[${BUBBLE_CAPACITY}];  // [waterLevelYLocal/R, fill01, seed, fade]
+// カメラ近傍の最大8球だけをCPUで選抜して詰める(A30)
+uniform vec4 uBubblePosR[${MAX_REFLECT_BUBBLES}];  // [cx, cy, cz, R_visual](補間 + 状態変形済み)
+uniform vec4 uBubbleMisc[${MAX_REFLECT_BUBBLES}];  // [waterLevelYLocal/R, fill01, seed, fade]
 uniform int uBubbleCount;                      // ≤ MAX_REFLECT_BUBBLES(8)
 #endif
 

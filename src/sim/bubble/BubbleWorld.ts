@@ -204,7 +204,7 @@ export class BubbleWorld {
     // ── 段 2: 雫カーネル(RNG フリー)
     this.droplets.step(waterY, rInner, this.absorbSink);
 
-    // ── 段 3: 衝突検出(グリッド rebuild → ペア列挙)
+    // ── 段 3: 衝突検出(列挙順は i → cell(j) → j を維持)
     const pairCount = this.shared.detector.findPairs(
       atoms,
       rInner,

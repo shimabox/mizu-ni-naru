@@ -30,6 +30,7 @@ export class DropletSystem implements RenderSystem {
   private posRPrev: InstancedBufferAttribute;
   private aux: InstancedBufferAttribute;
   private lastArray: Float32Array;
+  private lastUploadedStep = -1;
 
   constructor(sun: SunUniforms) {
     const quad = createBillboardQuadGeometry();
@@ -69,6 +70,7 @@ export class DropletSystem implements RenderSystem {
 
   public update(view: SkyRenderView, frame: FrameInfo): void {
     const droplets = view.droplets;
+    let rewrapped = false;
     if (this.lastArray !== droplets.posr) {
       // 再確保(実運用では発生しない想定)— 再ラップ
       this.lastArray = droplets.posr;
@@ -76,12 +78,16 @@ export class DropletSystem implements RenderSystem {
       this.posRPrev = wrap(droplets.prevPosr);
       this.aux = wrap(droplets.aux);
       this.applyAttributes();
+      rewrapped = true;
     }
-    const length = droplets.count * V4;
-    for (const attribute of [this.posR, this.posRPrev, this.aux]) {
-      attribute.clearUpdateRanges();
-      attribute.addUpdateRange(0, length);
-      attribute.needsUpdate = true;
+    if (rewrapped || this.lastUploadedStep !== view.step) {
+      this.lastUploadedStep = view.step;
+      const length = droplets.count * V4;
+      for (const attribute of [this.posR, this.posRPrev, this.aux]) {
+        attribute.clearUpdateRanges();
+        attribute.addUpdateRange(0, length);
+        attribute.needsUpdate = true;
+      }
     }
     this.geometry.instanceCount = droplets.count;
 

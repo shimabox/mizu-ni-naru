@@ -23,6 +23,7 @@ export class AtomViewAttributes {
   public count = 0;
 
   private lastArray: Float32Array;
+  private lastUploadedStep = -1;
 
   constructor() {
     // 初期はプレースホルダ容量配列(初回 sync で view の実配列に再ラップ)
@@ -36,6 +37,7 @@ export class AtomViewAttributes {
 
   public sync(view: SkyRenderView): void {
     const atoms = view.atoms;
+    let rewrapped = false;
     if (this.lastArray !== atoms.posr) {
       this.lastArray = atoms.posr;
       this.posR = wrap(atoms.posr);
@@ -43,8 +45,13 @@ export class AtomViewAttributes {
       this.colorKind = wrap(atoms.colorKind);
       this.aux = wrap(atoms.aux);
       this.generation++;
+      rewrapped = true;
     }
     this.count = atoms.count;
+    // 同じsim stepでは配列内容が変わらない。alpha/cameraはuniformなので、
+    // 0-step frameでattributeを再送せずとも補間表示は同一になる。
+    if (!rewrapped && this.lastUploadedStep === view.step) return;
+    this.lastUploadedStep = view.step;
     const length = atoms.count * V4;
     for (const attribute of [
       this.posR,

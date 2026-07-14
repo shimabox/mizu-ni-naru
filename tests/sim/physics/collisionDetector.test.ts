@@ -3,6 +3,7 @@ import { Atom } from '../../../src/sim/chem/Atom';
 import { Mulberry32 } from '../../../src/sim/core/Random';
 import { BruteForceDetector } from '../../../src/sim/physics/BruteForceDetector';
 import { GridDetector } from '../../../src/sim/physics/GridDetector';
+import { OrderedDirectDetector } from '../../../src/sim/physics/OrderedDirectDetector';
 import { SphereGrid } from '../../../src/sim/physics/SphereGrid';
 
 const R_INNER = 1.316; // 0.94 × 1.4
@@ -136,6 +137,43 @@ describe('GridDetector vs BruteForce オラクル(§3.4/§7.3)', () => {
     expect(lenDense).toBeGreaterThan(0);
     grid.findPairs([makeAtom(0, 0, 0)], R_INNER, out);
     expect(out.length).toBe(0);
+  });
+});
+
+describe('OrderedDirectDetector(GridDetector列挙順互換)', () => {
+  it('seed 1..12、40原子で平坦なペア列全体が一致する', () => {
+    const grid = new GridDetector();
+    const direct = new OrderedDirectDetector();
+    const gridOut: number[] = [];
+    const directOut: number[] = [];
+    let totalPairs = 0;
+
+    for (let seed = 1; seed <= 12; seed++) {
+      const atoms = randomCloud(seed, 40);
+      if (seed % 3 === 0) atoms[seed % atoms.length].dead = true;
+      const gridCount = grid.findPairs(atoms, R_INNER, gridOut);
+      const directCount = direct.findPairs(atoms, R_INNER, directOut);
+      expect(directCount).toBe(gridCount);
+      expect(directOut).toEqual(gridOut);
+      totalPairs += gridCount;
+    }
+
+    expect(totalPairs).toBeGreaterThan(0);
+  });
+
+  it('48原子まではdirect、49原子以上でもfallbackが同じ列を返す', () => {
+    const grid = new GridDetector();
+    const direct = new OrderedDirectDetector();
+
+    for (const count of [48, 49, 128]) {
+      const atoms = randomCloud(count, count);
+      const gridOut: number[] = [];
+      const directOut: number[] = [];
+      expect(direct.findPairs(atoms, R_INNER, directOut)).toBe(
+        grid.findPairs(atoms, R_INNER, gridOut),
+      );
+      expect(directOut).toEqual(gridOut);
+    }
   });
 });
 

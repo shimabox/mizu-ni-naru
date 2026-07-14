@@ -32,6 +32,13 @@ import {
 /** リングバッファ容量(§6 — モバイル縮小は Phase 4。裁定 A33/A35 でクラウン増量 +
  * 球体増量に合わせて余裕を確保)。 */
 export const SPRAY_CAPACITY = 4096;
+
+/**
+ * リングが初回飽和するまでは、書き込み済みprefixだけを描く。
+ * suffixはNEVER_SPAWNEDをvertex shaderでkillしていた領域なので省略しても同値。
+ */
+export const initializedSprayInstanceCount = (emittedCount: number): number =>
+  Math.min(emittedCount, SPRAY_CAPACITY);
 /** 最大寿命 [step](life ≤ 1.7s — 可視ウィンドウの打ち切りに使用)。 */
 const MAX_LIFE_STEPS = 1.7 * 60 + 10;
 /** 「未スポーン」を示す spawnStepF(age が巨大 → kill)。 */
@@ -97,6 +104,7 @@ export class SpraySystem implements RenderSystem {
   );
 
   private cursor = 0;
+  private emittedCount = 0;
   private lastViewStep = -1;
   private activeUntilStepF = -1;
   private wroteThisFrame = false;
@@ -129,7 +137,7 @@ export class SpraySystem implements RenderSystem {
     this.geometry.setAttribute('aSpawn', this.spawnAttr);
     this.geometry.setAttribute('aVel', this.velAttr);
     this.geometry.setAttribute('aTint', this.tintAttr);
-    this.geometry.instanceCount = SPRAY_CAPACITY;
+    this.geometry.instanceCount = 0;
 
     this.material = new ShaderMaterial({
       vertexShader: SPRAY_VERTEX_GLSL,
@@ -170,6 +178,8 @@ export class SpraySystem implements RenderSystem {
       this.lastViewStep = view.step;
     }
     if (this.wroteThisFrame) {
+      // emitごとではなくイベントbatchの最後に1回だけdraw範囲を更新する。
+      this.geometry.instanceCount = this.emittedCount;
       // spawn はイベント時のみ(~数回/20s)なので全レンジ一括で十分
       this.spawnAttr.clearUpdateRanges();
       this.spawnAttr.addUpdateRange(0, SPRAY_CAPACITY * 4);
@@ -392,6 +402,7 @@ export class SpraySystem implements RenderSystem {
     this.tintData[t] = tr;
     this.tintData[t + 1] = tg;
     this.tintData[t + 2] = tb;
+    this.emittedCount = initializedSprayInstanceCount(this.emittedCount + 1);
     this.cursor = (this.cursor + 1) % SPRAY_CAPACITY;
     this.wroteThisFrame = true;
     this.activeUntilStepF = Math.max(

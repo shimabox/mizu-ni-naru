@@ -96,7 +96,7 @@ export class OceanSystem implements RenderSystem {
 
     this.bubblePosR = [];
     this.bubbleMisc = [];
-    for (let i = 0; i < BUBBLE_CAPACITY; i++) {
+    for (let i = 0; i < MAX_REFLECT_BUBBLES; i++) {
       this.bubblePosR.push(new Vector4(0, 0, 0, 0));
       this.bubbleMisc.push(new Vector4(0, 0, 0, 0));
     }
@@ -173,8 +173,8 @@ export class OceanSystem implements RenderSystem {
    * 解析反射の球 uniform(§2.5 / A30)。prev/curr 補間 + 状態変形(Spawning の
    * スケールイン / Splashing の膨張・フェード)を CPU で適用し、
    * 見た目半径 R_visual と fade を渡す。Dead は除外。
-   * 容量 16 のうちカメラに近い ≤8 球を毎フレーム CPU 選抜(uniform 詰め替えのみ
-   * — 描画コスト維持のためシェーダのループは 8 固定)。
+   * 世界容量128のうちカメラに近い≤8球を毎フレームCPU選抜し、8要素の
+   * uniform配列へ詰める(描画コスト維持のためシェーダのループも8固定)。
    */
   private packBubbles(view: SkyRenderView, frame: FrameInfo): number {
     const alpha = frame.alpha;

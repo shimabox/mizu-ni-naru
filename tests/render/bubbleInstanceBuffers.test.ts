@@ -1,8 +1,12 @@
+import { PerspectiveCamera } from 'three';
 import { describe, expect, it } from 'vitest';
 import {
+  type BubbleBucket,
+  BubbleInstanceBuffers,
   bubbleVisualSeed,
   sortBubblesFarToNear,
 } from '../../src/render/bubbles/BubbleInstanceBuffers';
+import { StubSim } from '../../src/sim/StubSim';
 
 const STRIDE = 8;
 
@@ -64,5 +68,68 @@ describe('bubbleVisualSeed(裁定 A22)', () => {
       seeds.reduce((a, b) => a + (b - mean) ** 2, 0) / seeds.length;
     // 一様 [0,1) の分散 ≈ 0.083 — 半分以上の散らばりを要求
     expect(varSum).toBeGreaterThan(0.04);
+  });
+});
+
+const bucketVersions = (bucket: BubbleBucket): number[] => [
+  bucket.currA.version,
+  bucket.currB.version,
+  bucket.prevA.version,
+  bucket.prevB.version,
+  bucket.misc.version,
+];
+
+const bufferVersions = (buffers: BubbleInstanceBuffers): number[] => [
+  ...bucketVersions(buffers.near),
+  ...bucketVersions(buffers.far),
+];
+
+const bucketSnapshot = (bucket: BubbleBucket): number[] => [
+  bucket.count,
+  ...Array.from(bucket.currA.array.slice(0, bucket.count * 4)),
+  ...Array.from(bucket.currB.array.slice(0, bucket.count * 4)),
+  ...Array.from(bucket.prevA.array.slice(0, bucket.count * 4)),
+  ...Array.from(bucket.prevB.array.slice(0, bucket.count * 4)),
+  ...Array.from(bucket.misc.array.slice(0, bucket.count * 2)),
+];
+
+describe('BubbleInstanceBuffers upload gating', () => {
+  it('同じstepでsort/LODが同じならcameraが微動しても再uploadしない', () => {
+    const sim = new StubSim();
+    sim.init({ seed: 7, slotCount: 7 });
+    const camera = new PerspectiveCamera();
+    camera.position.set(0, 5, 13);
+    const buffers = new BubbleInstanceBuffers();
+
+    buffers.sync(sim.view(), camera);
+    expect(bufferVersions(buffers)).toEqual(Array(10).fill(1));
+    camera.position.x += 1e-6;
+    buffers.sync(sim.view(), camera);
+    expect(bufferVersions(buffers)).toEqual(Array(10).fill(1));
+
+    sim.step();
+    buffers.sync(sim.view(), camera);
+    expect(bufferVersions(buffers)).toEqual(Array(10).fill(2));
+  });
+
+  it('同じstepでもcameraでsort/LODが変われば参照実装と同じ内容を再uploadする', () => {
+    const sim = new StubSim();
+    sim.init({ seed: 11, slotCount: 7 });
+    const camera = new PerspectiveCamera();
+    camera.position.set(0, 5, 13);
+    const buffers = new BubbleInstanceBuffers();
+    buffers.sync(sim.view(), camera);
+
+    camera.position.set(0, 5, -13);
+    const reference = new BubbleInstanceBuffers();
+    reference.sync(sim.view(), camera);
+    buffers.sync(sim.view(), camera);
+
+    expect(bufferVersions(buffers)).toEqual(Array(10).fill(2));
+    expect(bucketSnapshot(buffers.near)).toEqual(
+      bucketSnapshot(reference.near),
+    );
+    expect(bucketSnapshot(buffers.far)).toEqual(bucketSnapshot(reference.far));
+    expect(buffers.rippleIndexBySlot).toEqual(reference.rippleIndexBySlot);
   });
 });
