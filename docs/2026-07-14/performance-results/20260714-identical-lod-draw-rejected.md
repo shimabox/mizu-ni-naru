@@ -19,7 +19,7 @@
 
 ```sh
 npm run bench:browser -- --warmup 15 --seconds 30 --rounds 5 \
-  --output performance-results/raw/20260714-identical-lod-draw-after.json
+  --output docs/2026-07-14/performance-results/raw/20260714-identical-lod-draw-after.json
 ```
 
 - before raw: [`20260714-bubble-layout-upload-after.json`](raw/20260714-bubble-layout-upload-after.json)

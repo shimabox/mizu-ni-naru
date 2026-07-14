@@ -71,7 +71,7 @@ npm run profile:sim
 npm run bench:detectors
 npm run verify:detectors
 npm run bench:uploads
-npm run bench:browser -- --output performance-results/raw/browser.json
+npm run bench:browser -- --output docs/2026-07-14/performance-results/raw/browser.json
 ```
 
 `bench:browser`はproduction build、isolated Vite preview、isolated headless Chrome、固定viewport、warm-up、複数round、GPU timer、WebGL呼び出し計数、raw JSON保存、process/profile cleanupまで1コマンドで行う。

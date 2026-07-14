@@ -21,7 +21,7 @@
 ```sh
 npm run bench:uploads
 npm run bench:browser -- --warmup 15 --seconds 30 --rounds 5 \
-  --output performance-results/raw/20260714-bubble-layout-upload-after.json
+  --output docs/2026-07-14/performance-results/raw/20260714-bubble-layout-upload-after.json
 ```
 
 - browser before raw: [`20260714-droplet-step-upload-after.json`](raw/20260714-droplet-step-upload-after.json)。Droplet作業のafterからBubble変更まで他の製品変更がないため、本作業のbeforeとして再利用した。

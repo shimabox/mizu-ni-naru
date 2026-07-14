@@ -1,6 +1,6 @@
 /**
  * Production buildを固定条件のChromeで測る、依存パッケージ不要のCDP runner。
- * `npm run bench:browser -- --output performance-results/raw/example.json`
+ * `npm run bench:browser -- --output docs/2026-07-14/performance-results/raw/example.json`
  */
 import { execFile, spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';

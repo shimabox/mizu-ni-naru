@@ -20,7 +20,7 @@
 
 ```sh
 npm run bench:browser -- --warmup 15 --seconds 30 --rounds 5 \
-  --output performance-results/raw/20260714-spray-prefix-after.json
+  --output docs/2026-07-14/performance-results/raw/20260714-spray-prefix-after.json
 ```
 
 - before raw: [`20260714-ocean-uniform-after.json`](raw/20260714-ocean-uniform-after.json)。海面uniform変更のafter計測後、Spray製品コードを変更するまで他の製品変更がないため、そのまま本作業のclean beforeとして再利用した。

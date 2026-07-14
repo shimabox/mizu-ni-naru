@@ -800,7 +800,7 @@ beforeの無い変更を「性能改善」としてコミットしない。
 
 ### 7.7 記録テンプレート
 
-各結果は`performance-results/YYYYMMDD-<slug>.md`のような独立ファイルへ残す。
+各結果は`docs/YYYY-MM-DD/performance-results/YYYYMMDD-<slug>.md`のような独立ファイルへ残す。
 
 ```md
 # <作業単位名>
