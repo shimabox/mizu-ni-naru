@@ -73,7 +73,9 @@ export class BackdropBubbles implements RenderSystem {
   constructor(sun: SunUniforms) {
     // 遠景・小径 — A51: detail1→2 でファセット低減。A60: 4度目の「多角形」再発の
     // 真犯人と確定(A51/A54/A58 は実シム球のみ修正しこちらは放置されていた)。
-    // 実シム球(BubbleGlassSystem/InnerWaterSystem)と同じ detail4(500tri)に統一。
+    // detail4(500tri)へ引き上げ済み。前景球は2026-07-14にdetail6へ上げたが、
+    // Backdropは投影サイズが小さく固定画像でも外周の直線を判別できないため、
+    // 76 instances全体のvertex負荷を増やさずdetail4を維持する。
     const base = new IcosahedronGeometry(1, 4);
     this.geometry = new InstancedBufferGeometry();
     this.geometry.setIndex(base.getIndex());

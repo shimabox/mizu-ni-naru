@@ -10,3 +10,7 @@
 - [当日の計測手順](performance-results/README.md): この作業時点で使用した条件と進め方
 - [個別の計測結果](performance-results/): before / after、完全一致検証、採否の記録
 - [raw計測データ](performance-results/raw/): ブラウザ計測で保存したJSON
+
+## 追加調査
+
+- [球体の角ばり調査と対応](sphere-faceting/README.md): レイヤー別の切り分け、前景geometryの修正、A/B/A性能計測

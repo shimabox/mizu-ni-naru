@@ -5,7 +5,6 @@ import {
   type DataTexture,
   FrontSide,
   Group,
-  IcosahedronGeometry,
   InstancedBufferGeometry,
   Mesh,
   ShaderMaterial,
@@ -29,6 +28,7 @@ import {
   INNER_WATER_FRAGMENT_GLSL,
   INNER_WATER_VERTEX_GLSL,
 } from '../shaders/innerWater';
+import { createForegroundBubbleGeometry } from './BubbleGeometry';
 import type {
   BubbleBucket,
   BubbleInstanceBuffers,
@@ -147,8 +147,11 @@ export class InnerWaterSystem implements RenderSystem {
     // (詳細は BubbleGlassSystem.ts の A58 コメント参照)。水の体積も
     // ガラスと同じく far を detail4 に統一する(near と同レベル、LOD 差は
     // 実質ジオメトリではなく draw call の分岐のみに縮退)。
-    const volumeNearBase = new IcosahedronGeometry(1, 4); // 近距離ディテール(A54 — ガラス近距離と同一detail4に統一)
-    const volumeFarBase = new IcosahedronGeometry(1, 4); // 遠距離 LOD(A32→A51 detail1→A54 detail3→A58 detail4)
+    // 2026-07-14: detail4にも残る外周の直線区間を固定画像で再確認。Glassと
+    // InnerWaterの片方だけを上げても他方の輪郭が残るため、共通factoryの
+    // detail6へ両方を揃える。Backdropは投影サイズが小さいため対象外。
+    const volumeNearBase = createForegroundBubbleGeometry();
+    const volumeFarBase = createForegroundBubbleGeometry();
     this.volumeNearGeometry = makeInstanced(volumeNearBase, buffers.near);
     this.volumeFarGeometry = makeInstanced(volumeFarBase, buffers.far);
     this.volumeMaterial = new ShaderMaterial({
@@ -294,7 +297,7 @@ export class InnerWaterSystem implements RenderSystem {
 }
 
 const makeInstanced = (
-  base: IcosahedronGeometry | BufferGeometry,
+  base: BufferGeometry,
   bucket: BubbleBucket,
 ): InstancedBufferGeometry => {
   const geometry = new InstancedBufferGeometry();
