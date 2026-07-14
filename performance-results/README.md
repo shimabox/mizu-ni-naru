@@ -22,6 +22,15 @@ npm run profile:sim
 
 Profile results include wrapper overhead and nested time. Do not add rows together. Use the output to rank targets, then use `bench:sim` for the adoption decision.
 
+Collision detector threshold benchmark and exact compatibility check:
+
+```sh
+npm run bench:detectors
+npm run verify:detectors
+```
+
+`verify:detectors` runs the Grid reference and the production detector in lockstep for seeds 7, 42, 123, and 2026, comparing counts, mass ledger, and every active render-view value at checkpoints.
+
 ## Per-change procedure
 
 1. Record the current Git SHA and working-tree state.

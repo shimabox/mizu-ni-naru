@@ -11,6 +11,7 @@ import { BubbleWorld } from '../src/sim/bubble/BubbleWorld';
 import { DropletColumn } from '../src/sim/droplets/DropletColumn';
 import { MizuNiNaruSim } from '../src/sim/MizuNiNaruSim';
 import { GridDetector } from '../src/sim/physics/GridDetector';
+import { OrderedDirectDetector } from '../src/sim/physics/OrderedDirectDetector';
 import { SphereGrid } from '../src/sim/physics/SphereGrid';
 import { AggregatePacker } from '../src/sim/view/AggregatePacker';
 import { WaterBody } from '../src/sim/water/WaterBody';
@@ -84,6 +85,11 @@ sim.init({ seed: options.seed, slotCount: options.slotCount, pacing: 'desktop' }
 for (let step = 0; step < options.warmupSteps; step++) sim.step();
 
 instrument('BubbleWorld.step', BubbleWorld.prototype, 'step');
+instrument(
+  'OrderedDirectDetector.findPairs',
+  OrderedDirectDetector.prototype,
+  'findPairs',
+);
 instrument('GridDetector.findPairs', GridDetector.prototype, 'findPairs');
 instrument('SphereGrid.rebuild', SphereGrid.prototype, 'rebuild');
 instrument('DropletColumn.step', DropletColumn.prototype, 'step');

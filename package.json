@@ -15,7 +15,9 @@
     "dependency-graph": "depcruise src --config .dependency-cruiser.cjs --include-only \"^src\" --output-type dot | dot -T svg > dependency-graph.svg",
     "calibrate": "tsx scripts/calibrate.mts",
     "bench:sim": "tsx scripts/benchmark-sim.mts",
-    "profile:sim": "tsx scripts/profile-sim.mts"
+    "profile:sim": "tsx scripts/profile-sim.mts",
+    "bench:detectors": "tsx scripts/benchmark-detectors.mts",
+    "verify:detectors": "tsx scripts/verify-detector-compat.mts"
   },
   "keywords": [],
   "author": "",

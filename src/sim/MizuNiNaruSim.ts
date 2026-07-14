@@ -44,7 +44,7 @@ import {
   SPLASH_STRENGTH_V_REF,
 } from './config';
 import { Mulberry32, type Random } from './core/Random';
-import { GridDetector } from './physics/GridDetector';
+import { OrderedDirectDetector } from './physics/OrderedDirectDetector';
 import { ReactionRegistry } from './reactions/ReactionRegistry';
 import { HHFusion } from './reactions/rules/HHFusion';
 import { OxidationToDroplet } from './reactions/rules/OxidationToDroplet';
@@ -125,7 +125,7 @@ export class MizuNiNaruSim implements SimLike {
       rng,
       factory: this.factory,
       spawner: new Spawner(rng, this.factory),
-      detector: new GridDetector(),
+      detector: new OrderedDirectDetector(),
       registry,
     };
     this.slotCount = Math.max(1, Math.min(options.slotCount, BUBBLE_CAPACITY));
