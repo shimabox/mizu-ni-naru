@@ -47,6 +47,14 @@ npm run bench:browser -- --warmup 15 --seconds 30 --rounds 5 --width 1440 --heig
 
 Set `CHROME_PATH` or pass `--chrome /absolute/path` if Chrome is not in a standard location. `--url` is restricted to localhost and automatically receives `probe=1`.
 
+Display-refresh upload request benchmark:
+
+```sh
+npm run bench:uploads
+```
+
+This runs the fixed 60 Hz simulation behind 60, 120, and 144 Hz display schedules and counts `BufferAttribute.version` increments as GPU upload requests. It records upload frames, requests, requested bytes, and loop wall time without requiring a browser. Use it for `view.step`/dirty-version changes; confirm accepted changes with `bench:browser` as well.
+
 ## Per-change procedure
 
 1. Record the current Git SHA and working-tree state.
