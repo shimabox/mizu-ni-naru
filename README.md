@@ -83,7 +83,8 @@ npm run dev
 
 ## 開発ドキュメント
 
-設計・計測・検証の記録は[開発ドキュメント](docs/README.md)にまとめています。
+- [パフォーマンス計測ツールの使い方](docs/performance/README.md)
+- [設計・計測・検証の作業ログ](docs/README.md)
 
 ## アーキテクチャ
 
