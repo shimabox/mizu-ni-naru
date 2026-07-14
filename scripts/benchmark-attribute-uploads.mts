@@ -8,6 +8,10 @@ import { Color, PerspectiveCamera, Vector3 } from 'three';
 import { accumulate } from '../src/app/accumulator';
 import { AtomViewAttributes } from '../src/render/atoms/AtomViewAttributes';
 import { DropletSystem } from '../src/render/atoms/DropletSystem';
+import {
+  type BubbleBucket,
+  BubbleInstanceBuffers,
+} from '../src/render/bubbles/BubbleInstanceBuffers';
 import { MizuNiNaruSim } from '../src/sim/MizuNiNaruSim';
 
 interface Options {
@@ -62,6 +66,16 @@ const dropletVersionSum = (system: DropletSystem): number =>
   system.object.geometry.getAttribute('aPosRPrev').version +
   system.object.geometry.getAttribute('aAux').version;
 
+const bucketVersionSum = (bucket: BubbleBucket): number =>
+  bucket.currA.version +
+  bucket.currB.version +
+  bucket.prevA.version +
+  bucket.prevB.version +
+  bucket.misc.version;
+
+const bubbleVersionSum = (buffers: BubbleInstanceBuffers): number =>
+  bucketVersionSum(buffers.near) + bucketVersionSum(buffers.far);
+
 const options = parseArgs();
 const results = options.refreshRates.map((refreshHz) => {
   const sim = new MizuNiNaruSim();
@@ -83,6 +97,7 @@ const results = options.refreshRates.map((refreshHz) => {
     stepF: 0,
     timeSec: 0,
   };
+  const bubbleBuffers = new BubbleInstanceBuffers();
   const frames = refreshHz * options.seconds;
   const frameDtMs = 1000 / refreshHz;
   let remainder = 0;
@@ -93,6 +108,9 @@ const results = options.refreshRates.map((refreshHz) => {
   let dropletUploadFrames = 0;
   let dropletUploadRequests = 0;
   let dropletRequestedBytes = 0;
+  let bubbleUploadFrames = 0;
+  let bubbleUploadRequests = 0;
+  let bubbleRequestedBytes = 0;
   const start = performance.now();
 
   for (let frame = 0; frame < frames; frame++) {
@@ -127,6 +145,24 @@ const results = options.refreshRates.map((refreshHz) => {
         Float32Array.BYTES_PER_ELEMENT *
         dropletRequests;
     }
+    const timeSec = frame / refreshHz;
+    frameInfo.camera.position.set(
+      13.2 * Math.sin((2 * Math.PI * timeSec) / 240),
+      5.4 + 0.7 * Math.sin((2 * Math.PI * timeSec) / 61 + 1.3),
+      13.2 * Math.cos((2 * Math.PI * timeSec) / 240),
+    );
+    const beforeBubbleVersion = bubbleVersionSum(bubbleBuffers);
+    bubbleBuffers.sync(view, frameInfo.camera);
+    const bubbleRequests =
+      bubbleVersionSum(bubbleBuffers) - beforeBubbleVersion;
+    if (bubbleRequests > 0) {
+      bubbleUploadFrames++;
+      bubbleUploadRequests += bubbleRequests;
+      bubbleRequestedBytes +=
+        view.bubbles.count *
+        18 *
+        Float32Array.BYTES_PER_ELEMENT;
+    }
   }
   const elapsedMs = performance.now() - start;
   dropletSystem.dispose();
@@ -145,6 +181,11 @@ const results = options.refreshRates.map((refreshHz) => {
     dropletRequestedBytes,
     dropletUploadFrameRatio: dropletUploadFrames / frames,
     dropletMeanRequestedBytesPerFrame: dropletRequestedBytes / frames,
+    bubbleUploadFrames,
+    bubbleUploadRequests,
+    bubbleRequestedBytes,
+    bubbleUploadFrameRatio: bubbleUploadFrames / frames,
+    bubbleMeanRequestedBytesPerFrame: bubbleRequestedBytes / frames,
     elapsedMs,
     microsecondsPerFrame: (elapsedMs * 1000) / frames,
     finalCounts: sim.counts(),

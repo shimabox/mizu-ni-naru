@@ -53,7 +53,7 @@ Display-refresh upload request benchmark:
 npm run bench:uploads
 ```
 
-This runs the fixed 60 Hz simulation behind 60, 120, and 144 Hz display schedules and counts `BufferAttribute.version` increments as GPU upload requests. Atom and Droplet attributes are reported separately. It records upload frames, requests, requested bytes, and loop wall time without requiring a browser. Use it for `view.step`/dirty-version changes; confirm accepted changes with `bench:browser` as well.
+This runs the fixed 60 Hz simulation behind 60, 120, and 144 Hz display schedules and counts `BufferAttribute.version` increments as GPU upload requests. Atom, Droplet, and camera-sorted Bubble attributes are reported separately. It records upload frames, requests, requested bytes, and loop wall time without requiring a browser. Use it for `view.step`/dirty-layout changes; confirm accepted changes with `bench:browser` as well.
 
 ## Per-change procedure
 
