@@ -121,7 +121,7 @@ export class SceneRenderer implements SkyRenderer {
       ),
     );
     // 球内の雫着水しぶき。水面の後・ガラスの前に描き、内殻の中へ閉じる。
-    this.addSystem(new InnerSplashSystem(environment.sunUniforms));
+    this.addSystem(new InnerSplashSystem());
     this.addSystem(
       new BubbleGlassSystem(environment.sunUniforms, this.bubbleBuffers),
     );

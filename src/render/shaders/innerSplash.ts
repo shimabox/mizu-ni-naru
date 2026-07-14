@@ -25,7 +25,7 @@ export const INNER_SPLASH_VERTEX_GLSL = /* glsl */ `
 precision highp float;
 attribute vec4 aSpawn;    // [localX, localY, localZ, spawnStepF]
 attribute vec4 aVelocity; // [vx/R, vy/R, vz/R, lifeSec]
-attribute vec4 aBubble;   // [slot, R, size/R, seed]
+attribute vec3 aBubble;   // [slot, R, size/R]
 attribute vec3 aTint;
 uniform float uStepF;
 uniform vec3 uCamRight;
@@ -33,7 +33,6 @@ uniform vec3 uCamUp;
 uniform vec4 uBubbleFrame[${INNER_SPLASH_TRACKED_BUBBLES}]; // [center.xyz, statePacked]
 varying vec2 vCorner;
 varying float vFade;
-varying float vSeed;
 varying vec3 vTint;
 ${BUBBLE_STATE_TRANSFORM_GLSL}
 
@@ -72,7 +71,6 @@ void main() {
 
   vCorner = position.xy;
   vFade = fade * (alive ? 1.0 : 0.0);
-  vSeed = aBubble.w;
   vTint = aTint;
   gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
 }
@@ -80,24 +78,18 @@ void main() {
 
 export const INNER_SPLASH_FRAGMENT_GLSL = /* glsl */ `
 precision highp float;
-uniform vec3 uSunColor;
 varying vec2 vCorner;
 varying float vFade;
-varying float vSeed;
 varying vec3 vTint;
 
 void main() {
   float r2 = dot(vCorner, vCorner);
   if (r2 > 1.0) discard;
   float z = sqrt(max(1.0 - r2, 0.0));
-  float fresnel = pow(1.0 - z, 2.4);
-  float variation = 0.90 + 0.10 * fract(sin(vSeed * 91.7) * 43758.5453);
-  vec3 color = vTint * (0.72 + 0.28 * z) * variation;
-  color += uSunColor * (0.18 * pow(z, 12.0));
-  color = min(color + vTint * fresnel * 0.10, vec3(1.0));
+  vec3 color = vTint * (0.82 + 0.18 * z);
 
   float edge = 1.0 - smoothstep(0.72, 1.0, sqrt(r2));
-  gl_FragColor = vec4(color, edge * vFade * 0.92);
+  gl_FragColor = vec4(color, edge * vFade * 0.82);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }

@@ -10,7 +10,6 @@ import {
 } from 'three';
 import type { SkyRenderView } from '../../contract/RenderView';
 import { BUBBLE_STATE, RIPPLE_VIEW_CAPACITY } from '../../contract/WorldSpec';
-import type { SunUniforms } from '../Environment';
 import type { FrameInfo, QualityTier, RenderSystem } from '../RenderSystem';
 import {
   createBillboardQuadGeometry,
@@ -33,8 +32,8 @@ const TWO_PI = 2 * Math.PI;
 export const INNER_SPLASH_MIN_STRENGTH = 0.6;
 export const INNER_SPLASH_MAX_STRENGTH = 1.0;
 /** 同時発火時は新しい粒を優先して古い粒を上書きする固定リング容量。 */
-export const INNER_SPLASH_CAPACITY = 256;
-const MAX_LIFE_STEPS = Math.ceil(1.05 * 60) + 2;
+export const INNER_SPLASH_CAPACITY = 128;
+export const INNER_SPLASH_MAX_LIFE_STEPS = Math.ceil(0.65 * 60) + 2;
 /** A52の優先順位に合わせ、tier2まではエフェクトを完全温存する。 */
 const BUDGET_BY_TIER: readonly number[] = [1.0, 1.0, 1.0, 0.7, 0.5];
 
@@ -45,7 +44,7 @@ export const isDropletInnerImpact = (strength: number): boolean =>
   strength >= INNER_SPLASH_MIN_STRENGTH &&
   strength <= INNER_SPLASH_MAX_STRENGTH + 1e-4;
 
-/** 小さな雫で7粒、大きな雫で12粒。品質予算は発生数だけへ掛ける。 */
+/** 小さな雫で3粒、大きな雫でも5粒に留め、波紋を主役にする。 */
 export const innerSplashParticleCount = (
   strength: number,
   budget = 1,
@@ -55,7 +54,7 @@ export const innerSplashParticleCount = (
     (strength - INNER_SPLASH_MIN_STRENGTH) /
       (INNER_SPLASH_MAX_STRENGTH - INNER_SPLASH_MIN_STRENGTH),
   );
-  return Math.max(1, Math.round((7 + 5 * t) * Math.min(budget, 1)));
+  return Math.max(1, Math.round((3 + 2 * t) * Math.min(budget, 1)));
 };
 
 /** shaderと同じ「粒子半径を含む内殻境界」判定。 */
@@ -84,7 +83,7 @@ export class InnerSplashSystem implements RenderSystem {
   private readonly material: ShaderMaterial;
   private readonly spawnData = new Float32Array(INNER_SPLASH_CAPACITY * V4);
   private readonly velocityData = new Float32Array(INNER_SPLASH_CAPACITY * V4);
-  private readonly bubbleData = new Float32Array(INNER_SPLASH_CAPACITY * V4);
+  private readonly bubbleData = new Float32Array(INNER_SPLASH_CAPACITY * V3);
   private readonly tintData = new Float32Array(INNER_SPLASH_CAPACITY * V3);
   private readonly spawnAttr: InstancedBufferAttribute;
   private readonly velocityAttr: InstancedBufferAttribute;
@@ -101,7 +100,7 @@ export class InnerSplashSystem implements RenderSystem {
   private batchStart = 0;
   private writesThisFrame = 0;
 
-  constructor(sun: SunUniforms) {
+  constructor() {
     for (let i = 0; i < INNER_SPLASH_TRACKED_BUBBLES; i++) {
       this.bubbleFrame.push(new Vector4(0, 0, 0, BUBBLE_STATE.Dead));
     }
@@ -114,7 +113,7 @@ export class InnerSplashSystem implements RenderSystem {
 
     this.spawnAttr = dynamicAttribute(this.spawnData, V4);
     this.velocityAttr = dynamicAttribute(this.velocityData, V4);
-    this.bubbleAttr = dynamicAttribute(this.bubbleData, V4);
+    this.bubbleAttr = dynamicAttribute(this.bubbleData, V3);
     this.tintAttr = dynamicAttribute(this.tintData, V3);
     this.geometry.setAttribute('aSpawn', this.spawnAttr);
     this.geometry.setAttribute('aVelocity', this.velocityAttr);
@@ -125,7 +124,6 @@ export class InnerSplashSystem implements RenderSystem {
       vertexShader: INNER_SPLASH_VERTEX_GLSL,
       fragmentShader: INNER_SPLASH_FRAGMENT_GLSL,
       uniforms: {
-        uSunColor: sun.uSunColor,
         uStepF: { value: 0 },
         uCamRight: { value: new Vector3(1, 0, 0) },
         uCamUp: { value: new Vector3(0, 1, 0) },
@@ -219,14 +217,15 @@ export class InnerSplashSystem implements RenderSystem {
         (strength - INNER_SPLASH_MIN_STRENGTH) /
           (INNER_SPLASH_MAX_STRENGTH - INNER_SPLASH_MIN_STRENGTH),
       );
-      const impactRadius = bubbleR * 0.095 * Math.max(impact01, 0.5);
+      const impactRadius = bubbleR * 0.06 * Math.max(impact01, 0.5);
 
       for (let i = 0; i < particleCount; i++) {
-        const az = ((i + rng() * 0.35) / particleCount) * TWO_PI;
-        const particleRadius = bubbleR * (0.02 + rng() * 0.015);
+        // 均等な円形クラウンにはせず、着水点から不揃いに少しだけ跳ねる。
+        const az = rng() * TWO_PI;
+        const particleRadius = bubbleR * (0.018 + rng() * 0.008);
         const margin = particleRadius * INNER_SPLASH_MAX_STRETCH;
         const localY = waterY + margin;
-        const jitter = impactRadius * (0.04 + rng() * 0.12);
+        const jitter = impactRadius * (0.01 + rng() * 0.09);
         let px = localX + Math.cos(az) * jitter;
         let pz = localZ + Math.sin(az) * jitter;
         const maxCenterRadius = Math.max(
@@ -244,8 +243,8 @@ export class InnerSplashSystem implements RenderSystem {
         }
 
         const speedScale = 0.8 + 0.2 * impact01;
-        const horizontalSpeed = (0.28 + rng() * 0.22) * speedScale;
-        const verticalSpeed = (0.8 + rng() * 0.4) * speedScale;
+        const horizontalSpeed = (0.08 + rng() * 0.14) * speedScale;
+        const verticalSpeed = (0.46 + rng() * 0.24) * speedScale;
         this.emit(
           view.step,
           slot,
@@ -256,9 +255,8 @@ export class InnerSplashSystem implements RenderSystem {
           Math.cos(az) * horizontalSpeed,
           verticalSpeed,
           Math.sin(az) * horizontalSpeed,
-          0.7 + rng() * 0.3,
+          0.42 + rng() * 0.16,
           particleRadius / bubbleR,
-          rng(),
           this.tintScratch[0],
           this.tintScratch[1],
           this.tintScratch[2],
@@ -279,7 +277,6 @@ export class InnerSplashSystem implements RenderSystem {
     vz: number,
     life: number,
     sizeRatio: number,
-    seed: number,
     tintR: number,
     tintG: number,
     tintB: number,
@@ -293,10 +290,10 @@ export class InnerSplashSystem implements RenderSystem {
     this.velocityData[o + 1] = vy;
     this.velocityData[o + 2] = vz;
     this.velocityData[o + 3] = life;
-    this.bubbleData[o] = slot;
-    this.bubbleData[o + 1] = bubbleR;
-    this.bubbleData[o + 2] = sizeRatio;
-    this.bubbleData[o + 3] = seed;
+    const b = this.cursor * V3;
+    this.bubbleData[b] = slot;
+    this.bubbleData[b + 1] = bubbleR;
+    this.bubbleData[b + 2] = sizeRatio;
     const t = this.cursor * V3;
     this.tintData[t] = tintR;
     this.tintData[t + 1] = tintG;
@@ -307,7 +304,7 @@ export class InnerSplashSystem implements RenderSystem {
     this.emittedCount = Math.min(this.emittedCount + 1, INNER_SPLASH_CAPACITY);
     this.activeUntilStepF = Math.max(
       this.activeUntilStepF,
-      step + MAX_LIFE_STEPS,
+      step + INNER_SPLASH_MAX_LIFE_STEPS,
     );
   }
 
@@ -320,7 +317,7 @@ export class InnerSplashSystem implements RenderSystem {
     for (const [attribute, itemSize] of [
       [this.spawnAttr, V4],
       [this.velocityAttr, V4],
-      [this.bubbleAttr, V4],
+      [this.bubbleAttr, V3],
       [this.tintAttr, V3],
     ] as const) {
       attribute.clearUpdateRanges();

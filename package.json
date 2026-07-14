@@ -18,6 +18,7 @@
     "profile:sim": "tsx scripts/profile-sim.mts",
     "bench:detectors": "tsx scripts/benchmark-detectors.mts",
     "verify:detectors": "tsx scripts/verify-detector-compat.mts",
+    "verify:splash-capacity": "tsx scripts/verify-inner-splash-capacity.mts",
     "bench:uploads": "tsx scripts/benchmark-attribute-uploads.mts",
     "bench:browser": "npm run build && tsx scripts/benchmark-browser.mts"
   },

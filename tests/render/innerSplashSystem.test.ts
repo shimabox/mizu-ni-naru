@@ -1,9 +1,7 @@
 import {
-  Color,
   type InstancedBufferAttribute,
   type InstancedBufferGeometry,
   PerspectiveCamera,
-  Vector3,
 } from 'three';
 import { describe, expect, it } from 'vitest';
 import type { SkyRenderView } from '../../src/contract/RenderView';
@@ -24,11 +22,7 @@ const frame = (stepF: number): FrameInfo => ({
   timeSec: stepF / 60,
 });
 
-const system = (): InnerSplashSystem =>
-  new InnerSplashSystem({
-    uSunDir: { value: new Vector3(0.48, 0.24, -0.84).normalize() },
-    uSunColor: { value: new Color(0xffd19a) },
-  });
+const system = (): InnerSplashSystem => new InnerSplashSystem();
 
 const withRipple = (
   view: SkyRenderView,
@@ -52,11 +46,11 @@ describe('InnerSplashSystem', () => {
     expect(isDropletInnerImpact(1.1)).toBe(false);
   });
 
-  it('strengthに応じて7〜12粒を決定論的に生成する', () => {
-    expect(innerSplashParticleCount(0.6)).toBe(7);
-    expect(innerSplashParticleCount(0.8)).toBe(10);
-    expect(innerSplashParticleCount(1.0)).toBe(12);
-    expect(innerSplashParticleCount(1.0, 0.5)).toBe(6);
+  it('strengthに応じて3〜5粒を決定論的に生成する', () => {
+    expect(innerSplashParticleCount(0.6)).toBe(3);
+    expect(innerSplashParticleCount(0.8)).toBe(4);
+    expect(innerSplashParticleCount(1.0)).toBe(5);
+    expect(innerSplashParticleCount(1.0, 0.5)).toBe(3);
   });
 
   it('粒子半径と最大伸長を含めて内殻境界を判定する', () => {
@@ -91,14 +85,15 @@ describe('InnerSplashSystem', () => {
     const bubble = geometry.getAttribute('aBubble') as InstancedBufferAttribute;
     for (let i = 0; i < expected; i++) {
       const o = i * 4;
-      const bubbleR = bubble.array[o + 1];
+      const b = i * 3;
+      const bubbleR = bubble.array[b + 1];
       expect(
         isInnerSplashInsideShell(
           spawn.array[o],
           spawn.array[o + 1],
           spawn.array[o + 2],
           bubbleR,
-          bubble.array[o + 2] * bubbleR,
+          bubble.array[b + 2] * bubbleR,
         ),
       ).toBe(true);
     }
