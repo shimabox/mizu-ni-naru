@@ -4,7 +4,7 @@
  *
  * 使用例:
  *   npm run profile:sim
- *   npm run profile:sim -- --slots 24 --warmup 2000 --steps 10000
+ *   npm run profile:sim -- --slots 24 --rounds 7 --warmup 2000 --steps 10000
  */
 import { performance } from 'node:perf_hooks';
 import { BubbleWorld } from '../src/sim/bubble/BubbleWorld';
@@ -21,6 +21,7 @@ interface Options {
   slotCount: number;
   warmupSteps: number;
   measureSteps: number;
+  rounds: number;
 }
 
 interface RecordValue {
@@ -43,6 +44,7 @@ const parseArgs = (): Options => {
     slotCount: 24,
     warmupSteps: 2_000,
     measureSteps: 10_000,
+    rounds: 7,
   };
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -53,6 +55,8 @@ const parseArgs = (): Options => {
       options.warmupSteps = positiveInteger(arg, args[++i]);
     } else if (arg === '--steps') {
       options.measureSteps = positiveInteger(arg, args[++i]);
+    } else if (arg === '--rounds') {
+      options.rounds = positiveInteger(arg, args[++i]);
     } else {
       throw new Error(`Unknown argument: ${arg}`);
     }
@@ -61,12 +65,14 @@ const parseArgs = (): Options => {
 };
 
 const records = new Map<string, RecordValue>();
+let recording = false;
 
 const instrument = (label: string, prototype: object, key: string): void => {
   const target = prototype as Record<string, (...args: unknown[]) => unknown>;
   const original = target[key];
   records.set(label, { calls: 0, elapsedMs: 0 });
   target[key] = function (this: unknown, ...args: unknown[]) {
+    if (!recording) return original.apply(this, args);
     const start = performance.now();
     try {
       return original.apply(this, args);
@@ -80,10 +86,6 @@ const instrument = (label: string, prototype: object, key: string): void => {
 };
 
 const options = parseArgs();
-const sim = new MizuNiNaruSim();
-sim.init({ seed: options.seed, slotCount: options.slotCount, pacing: 'desktop' });
-for (let step = 0; step < options.warmupSteps; step++) sim.step();
-
 instrument('BubbleWorld.step', BubbleWorld.prototype, 'step');
 instrument(
   'OrderedDirectDetector.findPairs',
@@ -96,27 +98,69 @@ instrument('DropletColumn.step', DropletColumn.prototype, 'step');
 instrument('AggregatePacker.pack', AggregatePacker.prototype, 'pack');
 instrument('WaterBody.commit', WaterBody.prototype, 'commit');
 
-const start = performance.now();
-for (let step = 0; step < options.measureSteps; step++) sim.step();
-const elapsedMs = performance.now() - start;
+const roundResults = Array.from({ length: options.rounds }, () => {
+  const sim = new MizuNiNaruSim();
+  sim.init({
+    seed: options.seed,
+    slotCount: options.slotCount,
+    pacing: 'desktop',
+  });
+  for (let step = 0; step < options.warmupSteps; step++) sim.step();
+
+  for (const record of records.values()) {
+    record.calls = 0;
+    record.elapsedMs = 0;
+  }
+  recording = true;
+  const start = performance.now();
+  for (let step = 0; step < options.measureSteps; step++) sim.step();
+  const elapsedMs = performance.now() - start;
+  recording = false;
+
+  return {
+    totalElapsedMs: elapsedMs,
+    totalMsPerStep: elapsedMs / options.measureSteps,
+    records: [...records]
+      .map(([name, record]) => ({
+        name,
+        calls: record.calls,
+        elapsedMs: record.elapsedMs,
+        msPerSimStep: record.elapsedMs / options.measureSteps,
+        inclusiveShareOfInstrumentedTotal: record.elapsedMs / elapsedMs,
+      }))
+      .filter((record) => record.calls > 0),
+    counts: sim.counts(),
+  };
+});
+
+const median = (values: readonly number[]): number => {
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.floor(sorted.length / 2)];
+};
+
+const recordNames = roundResults[0]?.records.map((record) => record.name) ?? [];
+const summary = {
+  totalSamplesMsPerStep: roundResults.map((round) => round.totalMsPerStep),
+  totalMedianMsPerStep: median(
+    roundResults.map((round) => round.totalMsPerStep),
+  ),
+  records: recordNames.map((name) => {
+    const samples = roundResults.map((round) => {
+      const record = round.records.find((candidate) => candidate.name === name);
+      if (!record) throw new Error(`Missing round record: ${name}`);
+      return record.msPerSimStep;
+    });
+    return { name, samplesMsPerStep: samples, medianMsPerStep: median(samples) };
+  }),
+};
 
 process.stdout.write(
   `${JSON.stringify(
     {
       measuredAt: new Date().toISOString(),
       options,
-      totalElapsedMs: elapsedMs,
-      totalMsPerStep: elapsedMs / options.measureSteps,
-      records: [...records]
-        .map(([name, record]) => ({
-          name,
-          calls: record.calls,
-          elapsedMs: record.elapsedMs,
-          msPerSimStep: record.elapsedMs / options.measureSteps,
-          inclusiveShareOfInstrumentedTotal: record.elapsedMs / elapsedMs,
-        }))
-        .filter((record) => record.calls > 0),
-      counts: sim.counts(),
+      summary,
+      rounds: roundResults,
     },
     null,
     2,

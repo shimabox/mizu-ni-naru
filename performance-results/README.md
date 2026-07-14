@@ -20,7 +20,7 @@ Inclusive method-boundary profile:
 npm run profile:sim
 ```
 
-Profile results include wrapper overhead and nested time. Do not add rows together. Use the output to rank targets, then use `bench:sim` for the adoption decision.
+The default profile also uses 7 rounds. Profile results include wrapper overhead and nested time. Do not add rows together. Use the output to rank targets, then use `bench:sim` for the adoption decision.
 
 Collision detector threshold benchmark and exact compatibility check:
 
