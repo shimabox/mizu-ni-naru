@@ -315,6 +315,7 @@ const metricKeys: readonly (keyof PerformanceProbeSnapshot)[] = [
   'instancedDrawCalls',
   'submittedVertices',
   'bufferSubDataBytes',
+  'uniform4fvBytes',
   'gpuMs',
 ];
 

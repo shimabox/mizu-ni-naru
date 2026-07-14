@@ -39,7 +39,7 @@ npm run bench:browser -- --output performance-results/raw/browser.json
 
 This command builds the app, starts an isolated Vite preview, launches an isolated headless Chrome profile, and writes five 30-second rounds after a 15-second warm-up. Defaults match the fixed measurement URL and 1440×727 viewport used by the baseline. The in-app probe is enabled only by `probe=1`; normal URLs and the lightweight `m=1` overlay do not install WebGL wrappers.
 
-The JSON contains nearest-rank distributions for rAF frame time, JS update time, draw calls, instanced draw calls, submitted vertices, `bufferSubData` bytes, and asynchronous `EXT_disjoint_timer_query_webgl2` GPU time. Raw rounds are retained, together with a median-of-round summaries block. Useful overrides are:
+The JSON contains nearest-rank distributions for rAF frame time, JS update time, draw calls, instanced draw calls, submitted vertices, `bufferSubData` bytes, `uniform4fv` bytes, and asynchronous `EXT_disjoint_timer_query_webgl2` GPU time. Raw rounds are retained, together with a median-of-round summaries block. Useful overrides are:
 
 ```sh
 npm run bench:browser -- --warmup 15 --seconds 30 --rounds 5 --width 1440 --height 727

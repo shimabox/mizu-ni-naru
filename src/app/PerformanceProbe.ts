@@ -20,6 +20,7 @@ export interface PerformanceProbeSnapshot {
   readonly instancedDrawCalls: DistributionSummary;
   readonly submittedVertices: DistributionSummary;
   readonly bufferSubDataBytes: DistributionSummary;
+  readonly uniform4fvBytes: DistributionSummary;
   readonly gpuMs: DistributionSummary;
   readonly gpuTimerAvailable: boolean;
   readonly gpuQueriesPending: number;
@@ -105,12 +106,14 @@ export class PerformanceProbe {
   private readonly originalDrawArraysInstanced: WebGL2RenderingContext['drawArraysInstanced'];
   private readonly originalDrawElementsInstanced: WebGL2RenderingContext['drawElementsInstanced'];
   private readonly originalBufferSubData: WebGL2RenderingContext['bufferSubData'];
+  private readonly originalUniform4fv: WebGL2RenderingContext['uniform4fv'];
   private readonly pendingGpuQueries: WebGLQuery[] = [];
   private activeGpuQuery: WebGLQuery | null = null;
   private frameDrawCalls = 0;
   private frameInstancedDrawCalls = 0;
   private frameSubmittedVertices = 0;
   private frameBufferSubDataBytes = 0;
+  private frameUniform4fvBytes = 0;
   private gpuDisjointSamples = 0;
   private readonly frameSamples: number[] = [];
   private readonly updateSamples: number[] = [];
@@ -118,6 +121,7 @@ export class PerformanceProbe {
   private readonly instancedDrawCallSamples: number[] = [];
   private readonly submittedVertexSamples: number[] = [];
   private readonly bufferSubDataSamples: number[] = [];
+  private readonly uniform4fvSamples: number[] = [];
   private readonly gpuSamples: number[] = [];
 
   constructor(canvas: HTMLCanvasElement) {
@@ -135,6 +139,7 @@ export class PerformanceProbe {
     this.originalDrawArraysInstanced = gl.drawArraysInstanced.bind(gl);
     this.originalDrawElementsInstanced = gl.drawElementsInstanced.bind(gl);
     this.originalBufferSubData = gl.bufferSubData.bind(gl);
+    this.originalUniform4fv = gl.uniform4fv.bind(gl);
 
     gl.drawArrays = (mode, first, count): void => {
       this.frameDrawCalls++;
@@ -201,6 +206,29 @@ export class PerformanceProbe {
         this.originalBufferSubData(target, dstByteOffset, srcData);
       }
     };
+    gl.uniform4fv = (
+      location: WebGLUniformLocation | null,
+      data: Float32List,
+      srcOffset?: number,
+      srcLength?: number,
+    ): void => {
+      const available = Math.max(0, data.length - (srcOffset ?? 0));
+      this.frameUniform4fvBytes +=
+        Math.min(available, srcLength ?? available) *
+        Float32Array.BYTES_PER_ELEMENT;
+      if (srcLength !== undefined) {
+        this.originalUniform4fv(
+          location,
+          data as Float32Array,
+          srcOffset ?? 0,
+          srcLength,
+        );
+      } else if (srcOffset !== undefined) {
+        this.originalUniform4fv(location, data as Float32Array, srcOffset);
+      } else {
+        this.originalUniform4fv(location, data);
+      }
+    };
   }
 
   public beginFrame(): void {
@@ -209,6 +237,7 @@ export class PerformanceProbe {
     this.frameInstancedDrawCalls = 0;
     this.frameSubmittedVertices = 0;
     this.frameBufferSubDataBytes = 0;
+    this.frameUniform4fvBytes = 0;
 
     if (!this.timerExtension || this.activeGpuQuery) return;
     const query = this.gl.createQuery();
@@ -230,6 +259,7 @@ export class PerformanceProbe {
     this.instancedDrawCallSamples.push(this.frameInstancedDrawCalls);
     this.submittedVertexSamples.push(this.frameSubmittedVertices);
     this.bufferSubDataSamples.push(this.frameBufferSubDataBytes);
+    this.uniform4fvSamples.push(this.frameUniform4fvBytes);
   }
 
   public reset(): void {
@@ -239,6 +269,7 @@ export class PerformanceProbe {
     this.instancedDrawCallSamples.length = 0;
     this.submittedVertexSamples.length = 0;
     this.bufferSubDataSamples.length = 0;
+    this.uniform4fvSamples.length = 0;
     this.gpuSamples.length = 0;
     this.gpuDisjointSamples = 0;
     for (const query of this.pendingGpuQueries) this.gl.deleteQuery(query);
@@ -254,6 +285,7 @@ export class PerformanceProbe {
       instancedDrawCalls: summarizeDistribution(this.instancedDrawCallSamples),
       submittedVertices: summarizeDistribution(this.submittedVertexSamples),
       bufferSubDataBytes: summarizeDistribution(this.bufferSubDataSamples),
+      uniform4fvBytes: summarizeDistribution(this.uniform4fvSamples),
       gpuMs: summarizeDistribution(this.gpuSamples),
       gpuTimerAvailable: this.timerExtension !== null,
       gpuQueriesPending: this.pendingGpuQueries.length,
@@ -267,6 +299,7 @@ export class PerformanceProbe {
     this.gl.drawArraysInstanced = this.originalDrawArraysInstanced;
     this.gl.drawElementsInstanced = this.originalDrawElementsInstanced;
     this.gl.bufferSubData = this.originalBufferSubData;
+    this.gl.uniform4fv = this.originalUniform4fv;
     if (this.activeGpuQuery) this.gl.deleteQuery(this.activeGpuQuery);
     for (const query of this.pendingGpuQueries) this.gl.deleteQuery(query);
     this.pendingGpuQueries.length = 0;
