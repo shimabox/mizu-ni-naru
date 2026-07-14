@@ -401,6 +401,8 @@ shaderのループ上限とCPU選抜は `MAX_REFLECT_BUBBLES = 8` なのに、un
 
 ## 3.7 実質消滅したnear/far LODを統合
 
+試作・不採用。全球`all` bucketを追加してGlassを4→2 draw、InnerWater volumeを2→1 drawへ統合したが、追加attribute転送に対してGPU / Frame時間の改善が一貫しなかった。製品コードは戻した。正式結果は[`performance-results/20260714-identical-lod-draw-rejected.md`](performance-results/20260714-identical-lod-draw-rejected.md)を参照。
+
 対象:
 
 - `src/render/bubbles/BubbleInstanceBuffers.ts`
