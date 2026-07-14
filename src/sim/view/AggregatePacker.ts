@@ -161,14 +161,20 @@ export class AggregatePacker {
       bubbleData[bo + 7] = s.statePacked;
       // 再ロール(スポーン)フレームは prev = curr — 補間ワープなし
       if (this.hasPrevPacked[i] === 1 && !s.justRespawned) {
-        this.bubblePrev.set(
-          this.prevPacked.subarray(bo, bo + BUBBLE_STRIDE),
-          bo,
-        );
+        for (let lane = 0; lane < BUBBLE_STRIDE; lane++) {
+          const offset = bo + lane;
+          const current = bubbleData[offset];
+          this.bubblePrev[offset] = this.prevPacked[offset];
+          this.prevPacked[offset] = current;
+        }
       } else {
-        this.bubblePrev.set(bubbleData.subarray(bo, bo + BUBBLE_STRIDE), bo);
+        for (let lane = 0; lane < BUBBLE_STRIDE; lane++) {
+          const offset = bo + lane;
+          const current = bubbleData[offset];
+          this.bubblePrev[offset] = current;
+          this.prevPacked[offset] = current;
+        }
       }
-      this.prevPacked.set(bubbleData.subarray(bo, bo + BUBBLE_STRIDE), bo);
       this.hasPrevPacked[i] = 1;
 
       // 原子(挿入順、ワールド集約、スポーンフレームは prev = curr)
