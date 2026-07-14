@@ -13,7 +13,9 @@
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.sim.json",
     "depcruise": "depcruise src --config .dependency-cruiser.cjs",
     "dependency-graph": "depcruise src --config .dependency-cruiser.cjs --include-only \"^src\" --output-type dot | dot -T svg > dependency-graph.svg",
-    "calibrate": "tsx scripts/calibrate.mts"
+    "calibrate": "tsx scripts/calibrate.mts",
+    "bench:sim": "tsx scripts/benchmark-sim.mts",
+    "profile:sim": "tsx scripts/profile-sim.mts"
   },
   "keywords": [],
   "author": "",
