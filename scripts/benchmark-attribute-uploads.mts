@@ -4,8 +4,10 @@
  */
 import { cpus, platform, release } from 'node:os';
 import { performance } from 'node:perf_hooks';
+import { Color, PerspectiveCamera, Vector3 } from 'three';
 import { accumulate } from '../src/app/accumulator';
 import { AtomViewAttributes } from '../src/render/atoms/AtomViewAttributes';
+import { DropletSystem } from '../src/render/atoms/DropletSystem';
 import { MizuNiNaruSim } from '../src/sim/MizuNiNaruSim';
 
 interface Options {
@@ -55,6 +57,11 @@ const attributeVersionSum = (attributes: AtomViewAttributes): number =>
   attributes.colorKind.version +
   attributes.aux.version;
 
+const dropletVersionSum = (system: DropletSystem): number =>
+  system.object.geometry.getAttribute('aPosR').version +
+  system.object.geometry.getAttribute('aPosRPrev').version +
+  system.object.geometry.getAttribute('aAux').version;
+
 const options = parseArgs();
 const results = options.refreshRates.map((refreshHz) => {
   const sim = new MizuNiNaruSim();
@@ -66,6 +73,16 @@ const results = options.refreshRates.map((refreshHz) => {
   for (let step = 0; step < options.warmupSteps; step++) sim.step();
 
   const attributes = new AtomViewAttributes();
+  const dropletSystem = new DropletSystem({
+    uSunDir: { value: new Vector3(0.485, 0.242, -0.841).normalize() },
+    uSunColor: { value: new Color(0xffd19a) },
+  });
+  const frameInfo = {
+    camera: new PerspectiveCamera(),
+    alpha: 0,
+    stepF: 0,
+    timeSec: 0,
+  };
   const frames = refreshHz * options.seconds;
   const frameDtMs = 1000 / refreshHz;
   let remainder = 0;
@@ -73,6 +90,9 @@ const results = options.refreshRates.map((refreshHz) => {
   let uploadFrames = 0;
   let uploadRequests = 0;
   let requestedBytes = 0;
+  let dropletUploadFrames = 0;
+  let dropletUploadRequests = 0;
+  let dropletRequestedBytes = 0;
   const start = performance.now();
 
   for (let frame = 0; frame < frames; frame++) {
@@ -91,8 +111,25 @@ const results = options.refreshRates.map((refreshHz) => {
       uploadRequests += requests;
       requestedBytes += view.atoms.count * 4 * Float32Array.BYTES_PER_ELEMENT * requests;
     }
+    frameInfo.alpha = acc.alpha;
+    frameInfo.stepF = view.step + acc.alpha;
+    frameInfo.timeSec = frameInfo.stepF / 60;
+    const beforeDropletVersion = dropletVersionSum(dropletSystem);
+    dropletSystem.update(view, frameInfo);
+    const dropletRequests =
+      dropletVersionSum(dropletSystem) - beforeDropletVersion;
+    if (dropletRequests > 0) {
+      dropletUploadFrames++;
+      dropletUploadRequests += dropletRequests;
+      dropletRequestedBytes +=
+        view.droplets.count *
+        4 *
+        Float32Array.BYTES_PER_ELEMENT *
+        dropletRequests;
+    }
   }
   const elapsedMs = performance.now() - start;
+  dropletSystem.dispose();
 
   return {
     refreshHz,
@@ -103,6 +140,11 @@ const results = options.refreshRates.map((refreshHz) => {
     requestedBytes,
     uploadFrameRatio: uploadFrames / frames,
     meanRequestedBytesPerFrame: requestedBytes / frames,
+    dropletUploadFrames,
+    dropletUploadRequests,
+    dropletRequestedBytes,
+    dropletUploadFrameRatio: dropletUploadFrames / frames,
+    dropletMeanRequestedBytesPerFrame: dropletRequestedBytes / frames,
     elapsedMs,
     microsecondsPerFrame: (elapsedMs * 1000) / frames,
     finalCounts: sim.counts(),
