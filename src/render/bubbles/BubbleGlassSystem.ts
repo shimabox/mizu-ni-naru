@@ -2,9 +2,9 @@ import {
   AdditiveBlending,
   BackSide,
   type BufferAttribute,
+  type BufferGeometry,
   FrontSide,
   Group,
-  IcosahedronGeometry,
   InstancedBufferGeometry,
   Mesh,
   ShaderMaterial,
@@ -17,6 +17,7 @@ import {
   GLASS_FRONT_FRAGMENT_GLSL,
   GLASS_VERTEX_GLSL,
 } from '../shaders/glass';
+import { createForegroundBubbleGeometry } from './BubbleGeometry';
 import type {
   BubbleBucket,
   BubbleInstanceBuffers,
@@ -27,7 +28,7 @@ import type {
  *
  * IcosahedronGeometry の instanced 2 draw(backside 加算 → frontside
  * αブレンド)を near/far バケットそれぞれに張る(計 4 draw)。近距離・
- * 遠距離とも detail4(A58 — 経緯は下記)。インスタンス属性は
+ * 遠距離とも detail6。インスタンス属性は
  * BubbleInstanceBuffers を InnerWaterSystem と共有(アップロード 1 回)。
  * 加算優位設計なので球間ソートにほぼ非感応(前後関係は buffers の
  * 遠→近順 + renderOrder の far→near 順が担保)。
@@ -45,8 +46,14 @@ import type {
  * ジオメトリ品質を近距離と同じ detail4 まで引き上げて解消する
  * (draw call 数は不変、三角形数のみ +約 10%)。
  *
+ * 2026-07-14の固定画像比較では、そのdetail4(500tri)にも大きく映る球の
+ * 外周へ短い直線区間が残った。shader法線は既に球面正規化されており、原因は
+ * 面内陰影ではなくシルエット密度だった。detail5にも平坦部が残り、detail6
+ * (980tri)で解消したため、GlassとInnerWater volumeを共通factoryから生成する。
+ * 片方だけでは青い水体または透明リムのどちらかに角ばりが残る。
+ *
  * A52 不変条件(「球体は球に見えるように、妥協しない」): 本クラスは
- * applyTier を実装しない — near/far の分割レベル(detail4 固定)は
+ * applyTier を実装しない — near/far の分割レベル(detail6 固定)は
  * どのティアでも変わらない。品質ラダーで負荷を吸収する対象は他システムの
  * renderScale/dprCap・エフェクトノブのみで、主役である球体ジオメトリの
  * 丸さはティア制御の対象外。
@@ -62,8 +69,8 @@ export class BubbleGlassSystem implements RenderSystem {
 
   constructor(sun: SunUniforms, buffers: BubbleInstanceBuffers) {
     this.buffers = buffers;
-    const nearBase = new IcosahedronGeometry(1, 4); // 近距離ディテール(§3、不変)
-    const farBase = new IcosahedronGeometry(1, 4); // 遠距離 LOD(A32 detail2 → A51 detail3 → A58 detail4)
+    const nearBase = createForegroundBubbleGeometry();
+    const farBase = createForegroundBubbleGeometry();
     this.nearGeometry = makeInstanced(nearBase, buffers.near);
     this.farGeometry = makeInstanced(farBase, buffers.far);
 
@@ -127,7 +134,7 @@ export class BubbleGlassSystem implements RenderSystem {
 }
 
 const makeInstanced = (
-  base: IcosahedronGeometry,
+  base: BufferGeometry,
   bucket: BubbleBucket,
 ): InstancedBufferGeometry => {
   const geometry = new InstancedBufferGeometry();

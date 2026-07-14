@@ -35,13 +35,13 @@ import type { QualityTier } from './RenderSystem';
  * up 側は不変(戻りは慎重なままでよい、というユーザーの意図を汲む)。
  *
  * A52 不変条件(ユーザー追補「球体は球に見えるように、そのへんは妥協したく
- * ない」): **球体ジオメトリの分割レベル(A51 — BubbleGlassSystem 近距離
- * detail4/遠距離 detail3、BackdropBubbles detail2)はティアのノブに一切
+ * ない」): **球体ジオメトリの分割レベル(前景Glass / InnerWater detail6、
+ * BackdropBubbles detail4)はティアのノブに一切
  * 含めない**。どのティアでも球は丸いまま固定。本ファイルのティア表(下記
  * RENDER_SCALE_BY_TIER 以下の全エクスポート)に球体 detail の項目が存在
  * しないのはこの不変条件による意図的な設計であり、欠落ではない。
  * backdropCount(COUNT_FRACTION_BY_TIER)は「遠景球の**個数**」を減らす
- * だけで、残った球 1 個ずつの丸さ(detail2)は不変 — 個数と detail は
+ * だけで、残った球 1 個ずつの丸さ(detail4)は不変 — 個数と detail は
  * 独立したノブとして区別すること。BubbleGlassSystem に applyTier 自体が
  * 存在しない(近景の主役球は詳細度・個数ともにティア非対象)のも同じ理由。
  *
