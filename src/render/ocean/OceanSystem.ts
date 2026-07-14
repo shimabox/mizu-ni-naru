@@ -102,8 +102,7 @@ export class OceanSystem implements RenderSystem {
     }
 
     this.sharedUniforms = {
-      uSunDir: sun.uSunDir,
-      uSunColor: sun.uSunColor,
+      ...sun,
       uWaveA: { value: waveA },
       uWaveB: { value: this.waveB },
       uSwellGain: { value: 1 },

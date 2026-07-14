@@ -14,3 +14,4 @@
 ## 追加調査
 
 - [球体の角ばり調査と対応](sphere-faceting/README.md): レイヤー別の切り分け、前景geometryの修正、A/B/A性能計測
+- [時刻連動の空](time-of-day-sky/README.md): 朝・昼・夕・夜、月と星、時刻固定、昼夜別の性能計測

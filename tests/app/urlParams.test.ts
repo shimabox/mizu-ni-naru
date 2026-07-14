@@ -12,11 +12,12 @@ describe('parseUrlParams', () => {
     expect(p.probe).toBe(false);
     expect(p.sim).toBeUndefined();
     expect(p.slots).toBeUndefined();
+    expect(p.timeMinutes).toBeUndefined();
   });
 
   it('正常値をパースする', () => {
     const p = parseUrlParams(
-      '?seed=7&m=1&q=2&dpr=1.5&probe=1&sim=stub&slots=5',
+      '?seed=7&m=1&q=2&dpr=1.5&probe=1&sim=stub&slots=5&time=21:30',
     );
     expect(p.seed).toBe(7);
     expect(p.measure).toBe(true);
@@ -25,11 +26,12 @@ describe('parseUrlParams', () => {
     expect(p.probe).toBe(true);
     expect(p.sim).toBe('stub');
     expect(p.slots).toBe(5);
+    expect(p.timeMinutes).toBe(21 * 60 + 30);
   });
 
   it('不正値は undefined に落とす(数値ガード)', () => {
     const p = parseUrlParams(
-      '?seed=abc&m=2&q=9&dpr=-1&probe=2&sim=real&slots=0',
+      '?seed=abc&m=2&q=9&dpr=-1&probe=2&sim=real&slots=0&time=24:00',
     );
     expect(p.seed).toBeUndefined();
     expect(p.measure).toBe(false);
@@ -38,6 +40,7 @@ describe('parseUrlParams', () => {
     expect(p.probe).toBe(false);
     expect(p.sim).toBeUndefined();
     expect(p.slots).toBeUndefined();
+    expect(p.timeMinutes).toBeUndefined();
   });
 
   it('非整数の seed / q / slots は拒否する', () => {
@@ -55,5 +58,13 @@ describe('parseUrlParams', () => {
       parseUrlParams(`?slots=${BUBBLE_CAPACITY + 1}`).slots,
     ).toBeUndefined();
     expect(parseUrlParams('?slots=1').slots).toBe(1);
+  });
+
+  it('timeはHH:MMを0..1439分へ変換する', () => {
+    expect(parseUrlParams('?time=0:00').timeMinutes).toBe(0);
+    expect(parseUrlParams('?time=08:05').timeMinutes).toBe(485);
+    expect(parseUrlParams('?time=23:59').timeMinutes).toBe(1439);
+    expect(parseUrlParams('?time=12').timeMinutes).toBeUndefined();
+    expect(parseUrlParams('?time=12:60').timeMinutes).toBeUndefined();
   });
 });

@@ -9,6 +9,7 @@ import { BUBBLE_CAPACITY } from '../contract/WorldSpec';
  * - probe=1: 詳細ブラウザ計測API(WebGL呼び出し計数 + GPU timer query)
  * - sim=stub: StubSim 差し替え
  * - slots: スロット数上書き(デバッグ用、1..BUBBLE_CAPACITY)
+ * - time=HH:MM: 空のローカル時刻を固定(省略時は端末時刻)
  */
 export interface UrlParams {
   readonly seed: number | undefined;
@@ -18,6 +19,7 @@ export interface UrlParams {
   readonly probe: boolean;
   readonly sim: 'stub' | undefined;
   readonly slots: number | undefined;
+  readonly timeMinutes: number | undefined;
 }
 
 const parseIntInRange = (
@@ -30,6 +32,18 @@ const parseIntInRange = (
   if (!Number.isFinite(n) || !Number.isInteger(n)) return undefined;
   if (n < min || n > max) return undefined;
   return n;
+};
+
+export const parseTimeMinutes = (raw: string | null): number | undefined => {
+  if (raw === null || raw === '') return undefined;
+  const match = /^(\d{1,2}):(\d{2})$/.exec(raw);
+  if (!match) return undefined;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+    return undefined;
+  }
+  return hours * 60 + minutes;
 };
 
 export const parseUrlParams = (search: string): UrlParams => {
@@ -50,5 +64,6 @@ export const parseUrlParams = (search: string): UrlParams => {
     probe: params.get('probe') === '1',
     sim: params.get('sim') === 'stub' ? 'stub' : undefined,
     slots: parseIntInRange(params.get('slots'), 1, BUBBLE_CAPACITY),
+    timeMinutes: parseTimeMinutes(params.get('time')),
   };
 };

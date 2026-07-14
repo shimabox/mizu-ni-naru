@@ -41,6 +41,8 @@ export interface SceneRendererOptions {
    * A52: dprCap をティア表に関わらず 1.75 に抑える(dprCapForTier)。
    */
   readonly isMobile?: boolean;
+  /** 空の時刻を0..1439分で固定。省略時は端末のローカル時刻へ追従する。 */
+  readonly timeMinutes?: number;
 }
 
 /**
@@ -61,6 +63,7 @@ export class SceneRenderer implements SkyRenderer {
   private readonly isMobile: boolean;
   private readonly noiseTexture: DataTexture;
   private readonly post: PostPipeline;
+  private readonly environment: Environment;
   private readonly bubbleBuffers: BubbleInstanceBuffers;
   private readonly atomAttributes: AtomViewAttributes;
   /** AdaptiveQuality ノブ(Phase 4)。既定は tier0 相当。 */
@@ -92,40 +95,40 @@ export class SceneRenderer implements SkyRenderer {
     });
     this.noiseTexture = createNoiseTexture();
 
-    const environment = new Environment(this.noiseTexture);
-    this.addSystem(environment);
+    this.environment = new Environment(this.noiseTexture, options?.timeMinutes);
+    this.addSystem(this.environment);
     // 遠景の書き割り球体フィールド(A41)— sim 非依存の render 専用装飾。
     // スカイの直後・近景の半透明群(InnerWater/Glass)の前に敷く(renderOrder 3.5)
-    this.addSystem(new BackdropBubbles(environment.sunUniforms));
+    this.addSystem(new BackdropBubbles(this.environment.sunUniforms));
     // リップルフィールドは FBO 専用(prerender で完結 — A27: bloom 連鎖・
     // 画面パスからは読まれない)。ocean が uniform 値オブジェクトを共有する
     const rippleField = new RippleField();
     this.addSystem(rippleField);
     this.addSystem(
       new OceanSystem(
-        environment.sunUniforms,
+        this.environment.sunUniforms,
         this.noiseTexture,
         rippleField.uniforms,
       ),
     );
     this.atomAttributes = new AtomViewAttributes();
-    this.addSystem(new DropletSystem(environment.sunUniforms));
+    this.addSystem(new DropletSystem(this.environment.sunUniforms));
     this.addSystem(new LabelSystem(this.atomAttributes));
     this.bubbleBuffers = new BubbleInstanceBuffers();
     this.addSystem(
       new InnerWaterSystem(
-        environment.sunUniforms,
+        this.environment.sunUniforms,
         this.bubbleBuffers,
         this.noiseTexture,
       ),
     );
     this.addSystem(
-      new BubbleGlassSystem(environment.sunUniforms, this.bubbleBuffers),
+      new BubbleGlassSystem(this.environment.sunUniforms, this.bubbleBuffers),
     );
     // スプレー(§6)— 着水クラウン + ポップ膜片。落着マイクロスプラットは
     // RippleField のスケジューラへ予約する
     this.addSystem(
-      new SpraySystem(environment.sunUniforms, rippleField.scheduler),
+      new SpraySystem(this.environment.sunUniforms, rippleField.scheduler),
     );
 
     this.post = new PostPipeline(
@@ -153,6 +156,7 @@ export class SceneRenderer implements SkyRenderer {
     for (const system of this.systems) {
       system.update(view, frame);
     }
+    this.renderer.toneMappingExposure = this.environment.exposure;
     for (const system of this.systems) {
       system.prerender?.(this.renderer);
     }

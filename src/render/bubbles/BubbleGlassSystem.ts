@@ -79,8 +79,7 @@ export class BubbleGlassSystem implements RenderSystem {
         vertexShader: GLASS_VERTEX_GLSL,
         fragmentShader: fragment,
         uniforms: {
-          uSunDir: sun.uSunDir,
-          uSunColor: sun.uSunColor,
+          ...sun,
           uAlpha: { value: 0 },
           uTimeSec: { value: 0 },
         },

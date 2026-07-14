@@ -42,6 +42,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     maxPixelRatio: params.dpr,
     parallax: !params.measure,
     isMobile,
+    timeMinutes: params.timeMinutes,
   });
 
   // 計測フック(E2E 検証・ベンチ用: SimCounts の読み出し。

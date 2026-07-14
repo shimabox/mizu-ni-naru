@@ -1,20 +1,13 @@
-import {
-  Color,
-  type InstancedBufferAttribute,
-  PerspectiveCamera,
-  Vector3,
-} from 'three';
+import { type InstancedBufferAttribute, PerspectiveCamera } from 'three';
 import { describe, expect, it } from 'vitest';
 import type { SkyRenderView } from '../../src/contract/RenderView';
+import { createStaticSunUniforms } from '../../src/render/Environment';
 import type { FrameInfo } from '../../src/render/RenderSystem';
 import { DropletSystem } from '../../src/render/atoms/DropletSystem';
 import { StubSim } from '../../src/sim/StubSim';
 
 const makeSystem = (): DropletSystem =>
-  new DropletSystem({
-    uSunDir: { value: new Vector3(0.485, 0.242, -0.841).normalize() },
-    uSunColor: { value: new Color(0xffd19a) },
-  });
+  new DropletSystem(createStaticSunUniforms());
 
 const makeFrame = (): FrameInfo => ({
   camera: new PerspectiveCamera(),

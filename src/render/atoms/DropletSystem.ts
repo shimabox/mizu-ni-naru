@@ -50,8 +50,7 @@ export class DropletSystem implements RenderSystem {
       vertexShader: DROPLET_VERTEX_GLSL,
       fragmentShader: DROPLET_FRAGMENT_GLSL,
       uniforms: {
-        uSunDir: sun.uSunDir,
-        uSunColor: sun.uSunColor,
+        ...sun,
         uAlpha: { value: 0 },
         uStepF: { value: 0 },
         uCamRight: { value: new Vector3(1, 0, 0) },

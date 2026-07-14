@@ -1,0 +1,497 @@
+{
+  "measuredAt": "2026-07-14T13:45:38.165Z",
+  "gitCommit": "8df1193fc92ddd317ba53300a4076dc0a3b70d43",
+  "gitWorkingTree": [
+    "M src/render/Environment.ts",
+    " M src/render/TimeOfDay.ts",
+    " M src/render/shaders/sky.ts",
+    " M tests/render/timeOfDay.test.ts",
+    "?? docs/2026-07-14/time-of-day-sky/raw/20260714-moon-legibility-before.json"
+  ],
+  "options": {
+    "url": "http://127.0.0.1:4173/?seed=7&slots=24&q=0&m=1&dpr=1&time=22%3A21&probe=1",
+    "warmupSeconds": 15,
+    "measureSeconds": 30,
+    "rounds": 5,
+    "viewportWidth": 1440,
+    "viewportHeight": 727,
+    "chromePath": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+  },
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/150.0.0.0 Safari/537.36",
+    "viewport": {
+      "innerWidth": 1440,
+      "innerHeight": 727,
+      "devicePixelRatio": 2,
+      "canvasClientWidth": 1440,
+      "canvasClientHeight": 727,
+      "drawingBufferWidth": 1440,
+      "drawingBufferHeight": 727
+    },
+    "webgl": {
+      "vendor": "Google Inc. (Apple)",
+      "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1, Unspecified Version)"
+    }
+  },
+  "medianOfRoundSummaries": {
+    "frameMs": {
+      "count": 1800,
+      "min": 15.599999999991269,
+      "p50": 16.69999999999709,
+      "p95": 17.59999999999127,
+      "p99": 17.69999999999709,
+      "max": 17.800000000017462,
+      "mean": 16.666
+    },
+    "updateMs": {
+      "count": 1800,
+      "min": 0.2999999523162842,
+      "p50": 0.800000011920929,
+      "p95": 1.5,
+      "p99": 1.9000000357627869,
+      "max": 10,
+      "mean": 0.924333332810137
+    },
+    "drawCalls": {
+      "count": 1800,
+      "min": 28,
+      "p50": 28,
+      "p95": 28,
+      "p99": 29,
+      "max": 30,
+      "mean": 28.026666666666667
+    },
+    "instancedDrawCalls": {
+      "count": 1800,
+      "min": 11,
+      "p50": 11,
+      "p95": 11,
+      "p99": 12,
+      "max": 13,
+      "mean": 11.026666666666667
+    },
+    "submittedVertices": {
+      "count": 1800,
+      "min": 595062,
+      "p50": 603426,
+      "p95": 613842,
+      "p99": 613860,
+      "max": 613872,
+      "mean": 603854.2866666666
+    },
+    "bufferSubDataBytes": {
+      "count": 1800,
+      "min": 23360,
+      "p50": 26304,
+      "p95": 29456,
+      "p99": 30928,
+      "max": 33968,
+      "mean": 26163.56048834628
+    },
+    "uniform4fvBytes": {
+      "count": 1800,
+      "min": 5120,
+      "p50": 5120,
+      "p95": 5120,
+      "p99": 5120,
+      "max": 5120,
+      "mean": 5120
+    },
+    "gpuMs": {
+      "count": 1800,
+      "min": 6.250333,
+      "p50": 14.870999,
+      "p95": 21.9885,
+      "p99": 25.103958,
+      "max": 30.361624,
+      "mean": 15.035746088938286
+    }
+  },
+  "rounds": [
+    {
+      "frameMs": {
+        "count": 1800,
+        "min": 15.599999999998545,
+        "p50": 16.69999999999709,
+        "p95": 17.400000000001455,
+        "p99": 17.600000000002183,
+        "max": 17.700000000004366,
+        "mean": 16.665944444444445
+      },
+      "updateMs": {
+        "count": 1800,
+        "min": 0.30000001192092896,
+        "p50": 0.800000011920929,
+        "p95": 1.5,
+        "p99": 1.9000000357627869,
+        "max": 4.299999952316284,
+        "mean": 0.9317777772744497
+      },
+      "drawCalls": {
+        "count": 1800,
+        "min": 28,
+        "p50": 28,
+        "p95": 28,
+        "p99": 29,
+        "max": 30,
+        "mean": 28.026666666666667
+      },
+      "instancedDrawCalls": {
+        "count": 1800,
+        "min": 11,
+        "p50": 11,
+        "p95": 11,
+        "p99": 12,
+        "max": 13,
+        "mean": 11.026666666666667
+      },
+      "submittedVertices": {
+        "count": 1800,
+        "min": 595710,
+        "p50": 603426,
+        "p95": 607164,
+        "p99": 610836,
+        "max": 610860,
+        "mean": 603854.2866666666
+      },
+      "bufferSubDataBytes": {
+        "count": 1800,
+        "min": 31456,
+        "p50": 32736,
+        "p95": 33776,
+        "p99": 33904,
+        "max": 33968,
+        "mean": 32784.217777777776
+      },
+      "uniform4fvBytes": {
+        "count": 1800,
+        "min": 5120,
+        "p50": 5120,
+        "p95": 5120,
+        "p99": 5120,
+        "max": 5120,
+        "mean": 5120
+      },
+      "gpuMs": {
+        "count": 1800,
+        "min": 6.827083,
+        "p50": 20.482541,
+        "p95": 38.032541,
+        "p99": 47.141541,
+        "max": 63.903666,
+        "mean": 22.05006760999999
+      },
+      "gpuTimerAvailable": true,
+      "gpuQueriesPending": 0,
+      "gpuDisjointSamples": 0
+    },
+    {
+      "frameMs": {
+        "count": 1800,
+        "min": 15.599999999991269,
+        "p50": 16.69999999999709,
+        "p95": 17.59999999999127,
+        "p99": 17.69999999999709,
+        "max": 17.80000000000291,
+        "mean": 16.666388888888893
+      },
+      "updateMs": {
+        "count": 1800,
+        "min": 0.30000001192092896,
+        "p50": 0.800000011920929,
+        "p95": 1.5,
+        "p99": 2.199999988079071,
+        "max": 10,
+        "mean": 0.924333332810137
+      },
+      "drawCalls": {
+        "count": 1800,
+        "min": 28,
+        "p50": 28,
+        "p95": 28,
+        "p99": 28,
+        "max": 28,
+        "mean": 28
+      },
+      "instancedDrawCalls": {
+        "count": 1800,
+        "min": 11,
+        "p50": 11,
+        "p95": 11,
+        "p99": 11,
+        "max": 11,
+        "mean": 11
+      },
+      "submittedVertices": {
+        "count": 1800,
+        "min": 595374,
+        "p50": 606726,
+        "p95": 614454,
+        "p99": 614532,
+        "max": 614556,
+        "mean": 605727.3933333333
+      },
+      "bufferSubDataBytes": {
+        "count": 1800,
+        "min": 27872,
+        "p50": 30336,
+        "p95": 32304,
+        "p99": 33008,
+        "max": 33232,
+        "mean": 30329.413333333334
+      },
+      "uniform4fvBytes": {
+        "count": 1800,
+        "min": 5120,
+        "p50": 5120,
+        "p95": 5120,
+        "p99": 5120,
+        "max": 5120,
+        "mean": 5120
+      },
+      "gpuMs": {
+        "count": 1799,
+        "min": 6.250333,
+        "p50": 14.870999,
+        "p95": 21.9885,
+        "p99": 25.103958,
+        "max": 30.361624,
+        "mean": 15.035746088938286
+      },
+      "gpuTimerAvailable": true,
+      "gpuQueriesPending": 1,
+      "gpuDisjointSamples": 0
+    },
+    {
+      "frameMs": {
+        "count": 1802,
+        "min": 15.60000000000582,
+        "p50": 16.69999999999709,
+        "p95": 17.40000000000873,
+        "p99": 17.60000000000582,
+        "max": 33.69999999999709,
+        "mean": 16.675138734739175
+      },
+      "updateMs": {
+        "count": 1802,
+        "min": 0.2999999523162842,
+        "p50": 0.800000011920929,
+        "p95": 1.899999976158142,
+        "p99": 3.699999988079071,
+        "max": 15.699999988079071,
+        "mean": 0.9892896781287898
+      },
+      "drawCalls": {
+        "count": 1802,
+        "min": 28,
+        "p50": 28,
+        "p95": 28,
+        "p99": 28,
+        "max": 29,
+        "mean": 28.000554938956714
+      },
+      "instancedDrawCalls": {
+        "count": 1802,
+        "min": 11,
+        "p50": 11,
+        "p95": 11,
+        "p99": 11,
+        "max": 11,
+        "mean": 11
+      },
+      "submittedVertices": {
+        "count": 1802,
+        "min": 595062,
+        "p50": 595392,
+        "p95": 613842,
+        "p99": 613860,
+        "max": 613872,
+        "mean": 600498.8573806881
+      },
+      "bufferSubDataBytes": {
+        "count": 1802,
+        "min": 23360,
+        "p50": 26304,
+        "p95": 29456,
+        "p99": 29744,
+        "max": 29968,
+        "mean": 26163.56048834628
+      },
+      "uniform4fvBytes": {
+        "count": 1802,
+        "min": 5120,
+        "p50": 5120,
+        "p95": 5120,
+        "p99": 5120,
+        "max": 5120,
+        "mean": 5120
+      },
+      "gpuMs": {
+        "count": 1801,
+        "min": 6.490458,
+        "p50": 16.094333,
+        "p95": 23.445416,
+        "p99": 27.936625,
+        "max": 38.277541,
+        "mean": 16.30710733647974
+      },
+      "gpuTimerAvailable": true,
+      "gpuQueriesPending": 1,
+      "gpuDisjointSamples": 0
+    },
+    {
+      "frameMs": {
+        "count": 1800,
+        "min": 15.5,
+        "p50": 16.69999999999709,
+        "p95": 17.60000000000582,
+        "p99": 17.70000000001164,
+        "max": 17.800000000017462,
+        "mean": 16.666
+      },
+      "updateMs": {
+        "count": 1800,
+        "min": 0.2999999523162842,
+        "p50": 0.699999988079071,
+        "p95": 1.2000000476837158,
+        "p99": 1.699999988079071,
+        "max": 2.700000047683716,
+        "mean": 0.7292222225003773
+      },
+      "drawCalls": {
+        "count": 1800,
+        "min": 28,
+        "p50": 28,
+        "p95": 29,
+        "p99": 30,
+        "max": 30,
+        "mean": 28.22277777777778
+      },
+      "instancedDrawCalls": {
+        "count": 1800,
+        "min": 11,
+        "p50": 11,
+        "p95": 12,
+        "p99": 13,
+        "max": 13,
+        "mean": 11.222777777777777
+      },
+      "submittedVertices": {
+        "count": 1800,
+        "min": 582948,
+        "p50": 598632,
+        "p95": 613824,
+        "p99": 613836,
+        "max": 613848,
+        "mean": 599391.11
+      },
+      "bufferSubDataBytes": {
+        "count": 1800,
+        "min": 12784,
+        "p50": 18176,
+        "p95": 23648,
+        "p99": 23808,
+        "max": 196680,
+        "mean": 19232.457777777778
+      },
+      "uniform4fvBytes": {
+        "count": 1800,
+        "min": 5120,
+        "p50": 5120,
+        "p95": 5120,
+        "p99": 5120,
+        "max": 5120,
+        "mean": 5120
+      },
+      "gpuMs": {
+        "count": 1799,
+        "min": 6.156916,
+        "p50": 13.595374,
+        "p95": 20.435125,
+        "p99": 23.360625,
+        "max": 28.632958,
+        "mean": 13.811246180100076
+      },
+      "gpuTimerAvailable": true,
+      "gpuQueriesPending": 1,
+      "gpuDisjointSamples": 0
+    },
+    {
+      "frameMs": {
+        "count": 1801,
+        "min": 15.5,
+        "p50": 16.699999999982538,
+        "p95": 17.699999999982538,
+        "p99": 17.70000000001164,
+        "max": 17.800000000017462,
+        "mean": 16.665408106607437
+      },
+      "updateMs": {
+        "count": 1801,
+        "min": 0.2999999523162842,
+        "p50": 0.699999988079071,
+        "p95": 1.2000000476837158,
+        "p99": 1.699999988079071,
+        "max": 12.200000047683716,
+        "mean": 0.7671293724847462
+      },
+      "drawCalls": {
+        "count": 1801,
+        "min": 28,
+        "p50": 29,
+        "p95": 30,
+        "p99": 30,
+        "max": 30,
+        "mean": 28.76013325930039
+      },
+      "instancedDrawCalls": {
+        "count": 1801,
+        "min": 11,
+        "p50": 12,
+        "p95": 13,
+        "p99": 13,
+        "max": 13,
+        "mean": 11.760133259300389
+      },
+      "submittedVertices": {
+        "count": 1801,
+        "min": 583608,
+        "p50": 611580,
+        "p95": 617172,
+        "p99": 617220,
+        "max": 617238,
+        "mean": 607010.8017767906
+      },
+      "bufferSubDataBytes": {
+        "count": 1801,
+        "min": 11184,
+        "p50": 20032,
+        "p95": 28560,
+        "p99": 30928,
+        "max": 206744,
+        "mean": 21193.563575791228
+      },
+      "uniform4fvBytes": {
+        "count": 1801,
+        "min": 5120,
+        "p50": 5120,
+        "p95": 5120,
+        "p99": 5120,
+        "max": 5120,
+        "mean": 5120
+      },
+      "gpuMs": {
+        "count": 1800,
+        "min": 5.403875,
+        "p50": 12.604875,
+        "p95": 19.247666,
+        "p99": 22.900083,
+        "max": 25.958375,
+        "mean": 12.714294314999986
+      },
+      "gpuTimerAvailable": true,
+      "gpuQueriesPending": 1,
+      "gpuDisjointSamples": 0
+    }
+  ]
+}
