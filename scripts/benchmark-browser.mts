@@ -3,6 +3,7 @@
  * `npm run bench:browser -- --output performance-results/raw/example.json`
  */
 import { execFile, spawn, type ChildProcess } from 'node:child_process';
+import { once } from 'node:events';
 import {
   access,
   mkdir,
@@ -175,6 +176,16 @@ const parseArgs = async (): Promise<Options> => {
 
 const delay = (milliseconds: number): Promise<void> =>
   new Promise((resolveDelay) => setTimeout(resolveDelay, milliseconds));
+
+const stopProcess = async (child: ChildProcess | undefined): Promise<void> => {
+  if (!child || child.exitCode !== null) return;
+  child.kill('SIGTERM');
+  await Promise.race([once(child, 'exit'), delay(5_000)]);
+  if (child.exitCode === null) {
+    child.kill('SIGKILL');
+    await Promise.race([once(child, 'exit'), delay(1_000)]);
+  }
+};
 
 const waitForHttp = async (
   url: string,
@@ -384,9 +395,15 @@ const run = async (): Promise<void> => {
 
   const cleanup = async (): Promise<void> => {
     cdp?.close();
-    if (chrome?.exitCode === null) chrome.kill('SIGTERM');
-    if (preview.exitCode === null) preview.kill('SIGTERM');
-    await rm(userDataDir, { recursive: true, force: true });
+    // Chromeがprofile fileを閉じる前にrmするとmacOSでENOTEMPTYになり得る。
+    await stopProcess(chrome);
+    await stopProcess(preview);
+    await rm(userDataDir, {
+      recursive: true,
+      force: true,
+      maxRetries: 5,
+      retryDelay: 100,
+    });
   };
 
   process.once('SIGINT', () => {
