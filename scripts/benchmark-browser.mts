@@ -68,7 +68,7 @@ interface BrowserEnvironment {
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const execFileAsync = promisify(execFile);
 const DEFAULT_URL =
-  'http://127.0.0.1:4173/?seed=7&slots=24&q=0&m=1&dpr=1&probe=1';
+  'http://127.0.0.1:4173/?seed=7&slots=24&q=0&m=1&dpr=1&time=08%3A00&probe=1';
 
 const positiveNumber = (name: string, raw: string | undefined): number => {
   const value = Number(raw);

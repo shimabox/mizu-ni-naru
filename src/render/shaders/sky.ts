@@ -1,5 +1,5 @@
 /**
- * 朝の解析グラデーションスカイ(design-render §7)。
+ * 時刻連動の解析グラデーションスカイ(design-render §7)。
  *
  * `SKY_CHUNK_GLSL` の `sky(dir)` はスカイ背景だけでなく、海・球・雫シェーダの
  * 反射/屈折/フォグの環境光源としても文字列連結で再利用される共有チャンク。
@@ -12,28 +12,26 @@
 export const SKY_UNIFORMS_GLSL = /* glsl */ `
 uniform vec3 uSunDir;
 uniform vec3 uSunColor;
+uniform vec3 uSkyHorizonCool;
+uniform vec3 uSkyHorizonWarm;
+uniform vec3 uSkyZenith;
+uniform vec3 uSkyBelow;
 `;
 
 /**
  * 解析スカイ関数。dir は正規化済みの世界方向ベクトル。
- * 太陽方位で地平線色が回る(cool #a9c3d6 ↔ warm #f2c39d、linear 値)。
- * 天頂は淡い蒼穹 #6a93bd、水平線下は海フォグと同系の #12303f。
- * 太陽ハロー+ディスクは HDR(>1 — ポスト導入後はブルームが拾う)。
+ * CPUで連続補間した空色を受け、主光源方位で地平線の暖色側を回す。
+ * 主光源ハロー+ディスクはHDR(>1ならポストのブルームが拾う)。
  */
 export const SKY_CHUNK_GLSL = /* glsl */ `
 vec3 sky(vec3 dir) {
   float h = dir.y;
 
-  const vec3 HORIZON_COOL = vec3(0.397, 0.546, 0.672);
-  const vec3 HORIZON_WARM = vec3(0.888, 0.546, 0.337);
-  const vec3 ZENITH = vec3(0.144, 0.292, 0.509);
-  const vec3 BELOW = vec3(0.006, 0.0296, 0.0497);
-
   float sunAz = max(dot(normalize(vec3(dir.x, 0.0, dir.z)),
                         normalize(vec3(uSunDir.x, 0.0, uSunDir.z))), 0.0);
-  vec3 horizon = mix(HORIZON_COOL, HORIZON_WARM, pow(sunAz, 3.0));
-  vec3 col = mix(horizon, ZENITH, pow(clamp(h, 0.0, 1.0), 0.55));
-  col = mix(col, BELOW, smoothstep(0.0, -0.12, h));
+  vec3 horizon = mix(uSkyHorizonCool, uSkyHorizonWarm, pow(sunAz, 3.0));
+  vec3 col = mix(horizon, uSkyZenith, pow(clamp(h, 0.0, 1.0), 0.55));
+  col = mix(col, uSkyBelow, smoothstep(0.0, -0.12, h));
 
   float s = max(dot(dir, uSunDir), 0.0);
   col += uSunColor * (0.30 * pow(s, 16.0) + 3.2 * pow(s, 900.0));
@@ -51,7 +49,11 @@ vec3 sky(vec3 dir) {
     float az = atan(dir.z, dir.x);
     float phase = az * 0.5 + h * 3.0;
     vec3 worldIrid = 0.5 + 0.5 * cos(6.28318 * (phase + vec3(0.0, 0.33, 0.67)));
-    col += worldIrid * (grazeBand * grazeBand) * 0.055;
+    // 夜の暗い水平線では絶対輝度0.055が相対的に強くなり、オーロラ状に
+    // 見えてしまう。昼の既存表現は保ちつつ、青の時間から夜は静かに消す。
+    float horizonLuma = dot(uSkyHorizonCool, vec3(0.2126, 0.7152, 0.0722));
+    float iridVisibility = smoothstep(0.035, 0.20, horizonLuma);
+    col += worldIrid * (grazeBand * grazeBand) * 0.055 * iridVisibility;
   }
   return col;
 }
@@ -87,14 +89,79 @@ ${SKY_CHUNK_GLSL}
 #ifdef SKY_BACKDROP
 uniform sampler2D uNoise;
 uniform float uTimeSec;
+uniform float uStarVisibility;
 #endif
 varying vec3 vDir;
+
+#ifdef SKY_BACKDROP
+float starHash(vec2 p) {
+  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+}
+#endif
 
 void main() {
   vec3 dir = normalize(vDir);
   vec3 col = sky(dir);
 
   #ifdef SKY_BACKDROP
+  // 星: 夜だけ評価する固定天球。セル中心には置かず個体ごとに位置をずらし、
+  // 等級・色温度・瞬きへ別々の乱数を与える。大半は遠い微光、ごく少数だけ
+  // 淡い光輪と短い光条を持つ。bloom閾値以下を基本に、水を主役に保つ。
+  if (uStarVisibility > 0.001 && dir.y > 0.0) {
+    vec2 sphereUv = vec2(
+      atan(dir.z, dir.x) / 6.2831853 + 0.5,
+      asin(clamp(dir.y, -1.0, 1.0)) / 3.1415927 + 0.5
+    );
+    vec2 starGrid = sphereUv * vec2(320.0, 160.0);
+    vec2 starCell = floor(starGrid);
+    float presence = starHash(starCell);
+    float magnitudeSeed = starHash(starCell + vec2(19.17, 47.53));
+    float temperatureSeed = starHash(starCell + vec2(71.89, 12.43));
+    vec2 starCenter = vec2(0.18) + 0.64 * vec2(
+      starHash(starCell + vec2(37.11, 83.17)),
+      starHash(starCell + vec2(93.41, 28.67))
+    );
+    vec2 starLocal = fract(starGrid) - starCenter;
+    float magnitude = pow(magnitudeSeed, 2.4);
+    float radius = mix(0.012, 0.052, magnitude);
+    float distanceFromStar = length(starLocal);
+    float core = 1.0 - smoothstep(
+      radius,
+      radius + 0.030,
+      distanceFromStar
+    );
+    float bright = step(0.78, magnitudeSeed);
+    float brilliant = step(0.965, magnitudeSeed);
+    float halo =
+      (1.0 - smoothstep(radius + 0.02, 0.19, distanceFromStar)) *
+      bright *
+      0.075;
+    float horizontalRay =
+      (1.0 - smoothstep(0.009, 0.024, abs(starLocal.y))) *
+      (1.0 - smoothstep(0.04, 0.15, abs(starLocal.x)));
+    float verticalRay =
+      (1.0 - smoothstep(0.009, 0.024, abs(starLocal.x))) *
+      (1.0 - smoothstep(0.04, 0.15, abs(starLocal.y)));
+    float shape = core + halo + brilliant * (horizontalRay + verticalRay) * 0.075;
+    float twinkleDepth = mix(0.025, 0.14, magnitudeSeed);
+    float twinklePhase =
+      uTimeSec * mix(0.22, 0.68, temperatureSeed) + presence * 74.0;
+    float twinkle = 1.0 - twinkleDepth * (0.5 - 0.5 * sin(twinklePhase));
+    float intensity = mix(0.18, 0.88, magnitude);
+    float star =
+      shape *
+      step(0.965, presence) *
+      smoothstep(0.01, 0.18, dir.y) *
+      twinkle;
+    vec3 temperatureColor = mix(
+      vec3(0.58, 0.71, 1.0),
+      vec3(1.0, 0.77, 0.55),
+      temperatureSeed
+    );
+    vec3 starColor = mix(temperatureColor, vec3(0.92, 0.93, 0.96), 0.62);
+    col += starColor * star * uStarVisibility * intensity;
+  }
+
   // 雲気: ごく薄い気配だけ(§0 Look)。地平線 h ∈ [0.02, 0.35] の帯
   float h = dir.y;
   float band = smoothstep(0.02, 0.08, h) * (1.0 - smoothstep(0.10, 0.35, h));
@@ -103,7 +170,7 @@ void main() {
     float c1 = texture2D(uNoise, cuv * 0.055 + vec2(uTimeSec * 0.0011, 0.0)).b;
     float c2 = texture2D(uNoise, cuv * 0.021 - vec2(0.0, uTimeSec * 0.0007)).b;
     float cloud = smoothstep(0.55, 0.95, c1 * 0.6 + c2 * 0.55);
-    col += vec3(0.05, 0.047, 0.042) * cloud * band;
+    col += uSkyHorizonCool * cloud * band * 0.12;
   }
   #endif
 

@@ -96,8 +96,7 @@ export class BackdropBubbles implements RenderSystem {
       uniforms: {
         uTimeSec: { value: 0 },
         uCount: { value: BACKDROP_COUNT_BUFFER },
-        uSunDir: sun.uSunDir,
-        uSunColor: sun.uSunColor,
+        ...sun,
       },
       transparent: true,
       depthTest: true,

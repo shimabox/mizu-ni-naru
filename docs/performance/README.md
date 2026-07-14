@@ -235,7 +235,7 @@ npm run bench:browser -- --output docs/2026-07-14/performance-results/raw/202607
 既定URL:
 
 ```text
-http://127.0.0.1:4173/?seed=7&slots=24&q=0&m=1&dpr=1&probe=1
+http://127.0.0.1:4173/?seed=7&slots=24&q=0&m=1&dpr=1&time=08%3A00&probe=1
 ```
 
 |オプション|既定値|意味|
@@ -250,6 +250,8 @@ http://127.0.0.1:4173/?seed=7&slots=24&q=0&m=1&dpr=1&probe=1
 |`--output`|未指定|JSON保存先。省略すると標準出力|
 
 `--url`を指定しても`probe=1`は自動付与される。通常の作品表示では詳細probeは読み込まれず、`probe=1`のときだけWebGL呼び出しを薄くラップする。`m=1`は軽量オーバーレイで、詳細probeとは別の機能である。
+
+空は通常、端末のローカル時刻へ追従する。性能比較では時間帯による空色・星の差を混ぜないよう、既定URLの`time=08:00`で従来の朝景へ固定する。夜経路を測る場合は`--url`で`time=21:00`を指定する。
 
 主な指標:
 

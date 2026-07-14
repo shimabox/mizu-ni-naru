@@ -184,8 +184,7 @@ export class InnerWaterSystem implements RenderSystem {
       vertexShader: INNER_CAP_VERTEX_GLSL,
       fragmentShader: INNER_CAP_FRAGMENT_GLSL,
       uniforms: {
-        uSunDir: sun.uSunDir,
-        uSunColor: sun.uSunColor,
+        ...sun,
         uAlpha: { value: 0 },
         uTimeSec: { value: 0 },
         uStepF: { value: 0 },

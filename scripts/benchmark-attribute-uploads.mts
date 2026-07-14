@@ -4,7 +4,7 @@
  */
 import { cpus, platform, release } from 'node:os';
 import { performance } from 'node:perf_hooks';
-import { Color, PerspectiveCamera, Vector3 } from 'three';
+import { PerspectiveCamera } from 'three';
 import { accumulate } from '../src/app/accumulator';
 import { AtomViewAttributes } from '../src/render/atoms/AtomViewAttributes';
 import { DropletSystem } from '../src/render/atoms/DropletSystem';
@@ -12,6 +12,7 @@ import {
   type BubbleBucket,
   BubbleInstanceBuffers,
 } from '../src/render/bubbles/BubbleInstanceBuffers';
+import { createStaticSunUniforms } from '../src/render/Environment';
 import { MizuNiNaruSim } from '../src/sim/MizuNiNaruSim';
 
 interface Options {
@@ -87,10 +88,7 @@ const results = options.refreshRates.map((refreshHz) => {
   for (let step = 0; step < options.warmupSteps; step++) sim.step();
 
   const attributes = new AtomViewAttributes();
-  const dropletSystem = new DropletSystem({
-    uSunDir: { value: new Vector3(0.485, 0.242, -0.841).normalize() },
-    uSunColor: { value: new Color(0xffd19a) },
-  });
+  const dropletSystem = new DropletSystem(createStaticSunUniforms());
   const frameInfo = {
     camera: new PerspectiveCamera(),
     alpha: 0,
