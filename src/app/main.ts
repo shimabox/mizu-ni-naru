@@ -5,13 +5,14 @@ import type { QualityTier } from '../render/RenderSystem';
 import { SceneRenderer } from '../render/SceneRenderer';
 import { MizuNiNaruSim } from '../sim/MizuNiNaruSim';
 import { StubSim } from '../sim/StubSim';
+import type { PerformanceProbeApi } from './PerformanceProbe';
 import { StatsOverlay } from './StatsOverlay';
 import { accumulate } from './accumulator';
 import { parseUrlParams } from './urlParams';
 
 const params = parseUrlParams(window.location.search);
 
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', async () => {
   const canvas = document.querySelector<HTMLCanvasElement>('#myCanvas');
   if (!canvas) {
     throw new Error('Canvas element not found');
@@ -74,6 +75,18 @@ window.addEventListener('DOMContentLoaded', () => {
     currentTier;
 
   const overlay = params.measure ? new StatsOverlay() : undefined;
+  // 詳細probeは明示時だけ別chunkを読み、通常URLのparse/compileコストも避ける。
+  const performanceProbe = params.probe
+    ? new (await import('./PerformanceProbe')).PerformanceProbe(canvas)
+    : undefined;
+  if (performanceProbe) {
+    const api: PerformanceProbeApi = {
+      reset: () => performanceProbe.reset(),
+      snapshot: () => performanceProbe.snapshot(),
+    };
+    (window as unknown as { __mizuPerf?: PerformanceProbeApi }).__mizuPerf =
+      api;
+  }
 
   let remainder = 0;
   let lastTimestamp: number | undefined;
@@ -87,6 +100,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
     adaptive?.update(frameDtMs);
 
+    performanceProbe?.beginFrame();
     const updateStart = performance.now();
     const acc = accumulate(remainder, frameDtMs);
     remainder = acc.remainder;
@@ -95,6 +109,7 @@ window.addEventListener('DOMContentLoaded', () => {
     }
     renderer.render(sim.view(), acc.alpha);
     const updateMs = performance.now() - updateStart;
+    performanceProbe?.endFrame(frameDtMs, updateMs);
 
     overlay?.update(frameDtMs, updateMs, sim.counts(), currentTier);
 

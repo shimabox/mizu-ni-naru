@@ -17,7 +17,8 @@
     "bench:sim": "tsx scripts/benchmark-sim.mts",
     "profile:sim": "tsx scripts/profile-sim.mts",
     "bench:detectors": "tsx scripts/benchmark-detectors.mts",
-    "verify:detectors": "tsx scripts/verify-detector-compat.mts"
+    "verify:detectors": "tsx scripts/verify-detector-compat.mts",
+    "bench:browser": "npm run build && tsx scripts/benchmark-browser.mts"
   },
   "keywords": [],
   "author": "",

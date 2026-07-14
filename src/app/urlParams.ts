@@ -6,6 +6,7 @@ import { BUBBLE_CAPACITY } from '../contract/WorldSpec';
  * - m=1:  計測モード(overlay + tier0 固定 + 視差無効 + カメラ t=0。seed は独立 — A17)
  * - q:    品質ティア固定 0..4
  * - dpr:  DPR 上限
+ * - probe=1: 詳細ブラウザ計測API(WebGL呼び出し計数 + GPU timer query)
  * - sim=stub: StubSim 差し替え
  * - slots: スロット数上書き(デバッグ用、1..BUBBLE_CAPACITY)
  */
@@ -14,6 +15,7 @@ export interface UrlParams {
   readonly measure: boolean;
   readonly q: number | undefined;
   readonly dpr: number | undefined;
+  readonly probe: boolean;
   readonly sim: 'stub' | undefined;
   readonly slots: number | undefined;
 }
@@ -45,6 +47,7 @@ export const parseUrlParams = (search: string): UrlParams => {
     measure: params.get('m') === '1',
     q: parseIntInRange(params.get('q'), 0, 4),
     dpr,
+    probe: params.get('probe') === '1',
     sim: params.get('sim') === 'stub' ? 'stub' : undefined,
     slots: parseIntInRange(params.get('slots'), 1, BUBBLE_CAPACITY),
   };
