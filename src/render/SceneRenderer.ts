@@ -26,6 +26,7 @@ import { BubbleInstanceBuffers } from './bubbles/BubbleInstanceBuffers';
 import { InnerWaterSystem } from './bubbles/InnerWaterSystem';
 import { OceanSystem } from './ocean/OceanSystem';
 import { RippleField } from './ocean/RippleField';
+import { InnerSplashSystem } from './particles/InnerSplashSystem';
 import { SpraySystem } from './particles/SpraySystem';
 
 /** 既定の DPR 上限(Retina 超のフィル爆発防止 — design-render §1.2)。 */
@@ -119,6 +120,8 @@ export class SceneRenderer implements SkyRenderer {
         this.noiseTexture,
       ),
     );
+    // 球内の雫着水しぶき。水面の後・ガラスの前に描き、内殻の中へ閉じる。
+    this.addSystem(new InnerSplashSystem(environment.sunUniforms));
     this.addSystem(
       new BubbleGlassSystem(environment.sunUniforms, this.bubbleBuffers),
     );

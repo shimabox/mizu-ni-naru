@@ -14,3 +14,4 @@
 ## 追加調査
 
 - [球体の角ばり調査と対応](sphere-faceting/README.md): レイヤー別の切り分け、前景geometryの修正、A/B/A性能計測
+- [球内着水しぶき](inner-water-splash/README.md): 雫着水しぶきの境界条件、実装、before / after性能計測
