@@ -153,6 +153,13 @@ export class BubbleInstanceBuffers {
   private readonly nearImpl = new MutableBucket();
   private readonly farImpl = new MutableBucket();
   private readonly order = new Int32Array(BUBBLE_CAPACITY);
+  private readonly nearByOrder = new Uint8Array(BUBBLE_CAPACITY);
+  private readonly uploadedOrder = new Int32Array(BUBBLE_CAPACITY).fill(-1);
+  private readonly uploadedNearByOrder = new Uint8Array(BUBBLE_CAPACITY);
+  private lastUploadedStep = -1;
+  private lastUploadedCount = -1;
+  private lastData: Float32Array | undefined;
+  private lastPrevData: Float32Array | undefined;
 
   constructor() {
     this.near = this.nearImpl;
@@ -165,31 +172,60 @@ export class BubbleInstanceBuffers {
     const cam = camera.position;
     sortBubblesFarToNear(bubbles.data, count, cam.x, cam.y, cam.z, this.order);
 
-    this.rippleIndexBySlot.fill(-1);
     const rippleStart = Math.max(count - RIPPLE_NEAR_COUNT, 0);
+    let layoutChanged =
+      view.step !== this.lastUploadedStep ||
+      count !== this.lastUploadedCount ||
+      bubbles.data !== this.lastData ||
+      bubbles.prevData !== this.lastPrevData;
 
-    let nearN = 0;
-    let farN = 0;
+    // 同じstepでもcamera移動でsort/LODが変わり得る。属性の並びに影響する
+    // orderとnear/farだけを先に比較し、完全同一なら再pack/uploadを省略する。
     for (let i = 0; i < count; i++) {
       const slot = this.order[i];
       const src = slot * STRIDE;
       const dx = bubbles.data[src] - cam.x;
       const dy = bubbles.data[src + 1] - cam.y;
       const dz = bubbles.data[src + 2] - cam.z;
-      const d2 = dx * dx + dy * dy + dz * dz;
+      const isNear = d2IsNear(dx * dx + dy * dy + dz * dz);
+      this.nearByOrder[i] = isNear;
+      if (
+        !layoutChanged &&
+        (this.uploadedOrder[i] !== slot ||
+          this.uploadedNearByOrder[i] !== isNear)
+      ) {
+        layoutChanged = true;
+      }
+    }
+    if (!layoutChanged) return;
+
+    this.rippleIndexBySlot.fill(-1);
+
+    let nearN = 0;
+    let farN = 0;
+    for (let i = 0; i < count; i++) {
+      const slot = this.order[i];
+      const src = slot * STRIDE;
 
       const rippleIdx = i >= rippleStart ? i - rippleStart : -1;
       if (rippleIdx >= 0) this.rippleIndexBySlot[slot] = rippleIdx;
       const seed = bubbleVisualSeed(slot, bubbles.data[src + 3]);
 
-      const bucket = d2 < LOD_NEAR_DISTANCE_SQ ? this.nearImpl : this.farImpl;
-      const dst = d2 < LOD_NEAR_DISTANCE_SQ ? nearN++ : farN++;
+      const isNear = this.nearByOrder[i] === 1;
+      const bucket = isNear ? this.nearImpl : this.farImpl;
+      const dst = isNear ? nearN++ : farN++;
       this.writeInstance(bucket, dst, slot, rippleIdx, seed, bubbles);
+      this.uploadedOrder[i] = slot;
+      this.uploadedNearByOrder[i] = this.nearByOrder[i];
     }
     this.nearImpl.count = nearN;
     this.farImpl.count = farN;
     this.nearImpl.upload();
     this.farImpl.upload();
+    this.lastUploadedStep = view.step;
+    this.lastUploadedCount = count;
+    this.lastData = bubbles.data;
+    this.lastPrevData = bubbles.prevData;
   }
 
   private writeInstance(
@@ -212,3 +248,6 @@ export class BubbleInstanceBuffers {
     bucket.fMisc[dst * 2 + 1] = seed;
   }
 }
+
+const d2IsNear = (distanceSq: number): 0 | 1 =>
+  distanceSq < LOD_NEAR_DISTANCE_SQ ? 1 : 0;
