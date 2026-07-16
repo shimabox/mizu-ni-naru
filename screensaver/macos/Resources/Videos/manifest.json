@@ -1,0 +1,130 @@
+{
+  "generatedAt": "2026-07-16T03:46:44.403Z",
+  "options": {
+    "durationSeconds": 62,
+    "crossfadeSeconds": 2,
+    "outputDurationSeconds": 60,
+    "width": 1280,
+    "height": 720,
+    "fps": 30,
+    "sourceBitrateMbps": 8,
+    "codec": "h264",
+    "crf": 21,
+    "seed": 7,
+    "chromePath": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+  },
+  "results": [
+    {
+      "period": "morning",
+      "time": "08:00",
+      "url": "http://127.0.0.1:4173/?seed=7&q=0&dpr=1&time=08%3A00",
+      "sourceMimeType": "video/webm;codecs=vp9",
+      "sourceBytes": 35746990,
+      "outputFile": "morning.mp4",
+      "sha256": "c366a1a9843f2c9b712430efed3f330109901313a9918dbcc86f966facab179d",
+      "probe": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "profile": "High",
+            "width": 1280,
+            "height": 720,
+            "pix_fmt": "yuv420p",
+            "avg_frame_rate": "30/1"
+          }
+        ],
+        "format": {
+          "duration": "60.033333",
+          "size": "26223664",
+          "bit_rate": "3494547"
+        }
+      }
+    },
+    {
+      "period": "day",
+      "time": "12:00",
+      "url": "http://127.0.0.1:4173/?seed=7&q=0&dpr=1&time=12%3A00",
+      "sourceMimeType": "video/webm;codecs=vp9",
+      "sourceBytes": 35092612,
+      "outputFile": "day.mp4",
+      "sha256": "fe0eb8f3b9cf4270c1c9f8d4f342b5e0f4bd6858b4a31bb6a3412afd98046422",
+      "probe": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "profile": "High",
+            "width": 1280,
+            "height": 720,
+            "pix_fmt": "yuv420p",
+            "avg_frame_rate": "30/1"
+          }
+        ],
+        "format": {
+          "duration": "60.033333",
+          "size": "29520812",
+          "bit_rate": "3933922"
+        }
+      }
+    },
+    {
+      "period": "evening",
+      "time": "18:15",
+      "url": "http://127.0.0.1:4173/?seed=7&q=0&dpr=1&time=18%3A15",
+      "sourceMimeType": "video/webm;codecs=vp9",
+      "sourceBytes": 38414249,
+      "outputFile": "evening.mp4",
+      "sha256": "534efb46f5ac7e1058546937ce117550bbb06954dc09bc8e6372439da7998963",
+      "probe": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "profile": "High",
+            "width": 1280,
+            "height": 720,
+            "pix_fmt": "yuv420p",
+            "avg_frame_rate": "30/1"
+          }
+        ],
+        "format": {
+          "duration": "60.000000",
+          "size": "27277163",
+          "bit_rate": "3636955"
+        }
+      }
+    },
+    {
+      "period": "night",
+      "time": "21:00",
+      "url": "http://127.0.0.1:4173/?seed=7&q=0&dpr=1&time=21%3A00",
+      "sourceMimeType": "video/webm;codecs=vp9",
+      "sourceBytes": 33776080,
+      "outputFile": "night.mp4",
+      "sha256": "7296baf3346956a7c729de787680a0686dae7d2c9eb796872a871894013398b6",
+      "probe": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "profile": "High",
+            "width": 1280,
+            "height": 720,
+            "pix_fmt": "yuv420p",
+            "avg_frame_rate": "30/1"
+          }
+        ],
+        "format": {
+          "duration": "60.000000",
+          "size": "13830642",
+          "bit_rate": "1844085"
+        }
+      }
+    }
+  ]
+}

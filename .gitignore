@@ -5,3 +5,4 @@ dist/
 coverage/
 calibrate-out/
 .playwright-mcp/
+/build/

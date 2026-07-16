@@ -113,6 +113,8 @@ app/        初期化とアプリケーションループ
 
 ## 開発ドキュメント
 
+- [macOSスクリーンセーバーのビルドとインストール](screensaver/macos/README.md)
+- [macOSスクリーンセーバーの性能計測](screensaver/macos/README.md#性能計測)
 - [パフォーマンス計測ツールの使い方](docs/performance/README.md)
 - [設計・計測・検証の作業ログ](docs/README.md)
 

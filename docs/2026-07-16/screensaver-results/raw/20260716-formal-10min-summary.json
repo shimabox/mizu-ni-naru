@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "startedAt": "2026-07-16T02:31:40.108Z",
+  "finishedAt": "2026-07-16T02:41:40.187Z",
+  "durationSeconds": 600,
+  "intervalSeconds": 5,
+  "activePid": 35770,
+  "processes": [
+    {
+      "pid": 35770,
+      "role": "full-screen-preview",
+      "sampleCount": 119,
+      "cpuPercent": {
+        "min": 0,
+        "mean": 7.13,
+        "max": 15.8
+      },
+      "rssMiB": {
+        "min": 41.38,
+        "mean": 64.33,
+        "max": 66.63,
+        "growth": -24.83
+      }
+    },
+    {
+      "pid": 35771,
+      "role": "idle-preview-host",
+      "sampleCount": 110,
+      "cpuPercent": {
+        "min": 0,
+        "mean": 0,
+        "max": 0
+      },
+      "rssMiB": {
+        "min": 34.53,
+        "mean": 35.59,
+        "max": 37.28,
+        "growth": -1.63
+      }
+    }
+  ]
+}

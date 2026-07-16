@@ -19,7 +19,12 @@
     "bench:detectors": "tsx scripts/benchmark-detectors.mts",
     "verify:detectors": "tsx scripts/verify-detector-compat.mts",
     "bench:uploads": "tsx scripts/benchmark-attribute-uploads.mts",
-    "bench:browser": "npm run build && tsx scripts/benchmark-browser.mts"
+    "bench:browser": "npm run build && tsx scripts/benchmark-browser.mts",
+    "screensaver:capture:mac": "npm run build && tsx scripts/capture-screensaver-videos.mts",
+    "screensaver:build:mac": "bash scripts/build-macos-screensaver.sh",
+    "screensaver:verify:mac": "bash scripts/verify-macos-screensaver.sh",
+    "screensaver:install:mac": "bash scripts/install-macos-screensaver.sh",
+    "screensaver:benchmark:mac": "tsx scripts/benchmark-macos-screensaver.mts"
   },
   "keywords": [],
   "author": "",

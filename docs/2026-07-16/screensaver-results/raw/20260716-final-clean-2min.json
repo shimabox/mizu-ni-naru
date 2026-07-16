@@ -1,0 +1,318 @@
+{
+  "schemaVersion": 1,
+  "startedAt": "2026-07-16T03:57:35.492Z",
+  "finishedAt": "2026-07-16T03:59:35.495Z",
+  "durationSeconds": 120,
+  "intervalSeconds": 5,
+  "bundleName": "MizuNiNaru.saver",
+  "activeCpuThresholdPercent": 0.5,
+  "primaryPid": 45890,
+  "processes": [
+    {
+      "pid": 45890,
+      "sampleCount": 24,
+      "activeSampleCount": 24,
+      "cpuPercent": {
+        "min": 3.5,
+        "mean": 6.16,
+        "max": 10.9
+      },
+      "rssMiB": {
+        "min": 66.83,
+        "mean": 67.91,
+        "max": 68.92,
+        "growth": -0.95
+      }
+    }
+  ],
+  "samples": [
+    {
+      "at": "2026-07-16T03:57:35.497Z",
+      "processes": [
+        {
+          "pid": 45890,
+          "cpuPercent": 6.1,
+          "rssMiB": 67.78125,
+          "elapsed": "00:45",
+          "state": "Ss"
+        }
+      ]
+    },
+    {
+      "at": "2026-07-16T03:57:40.539Z",
+      "processes": [
+        {
+          "pid": 45890,
+          "cpuPercent": 5.3,
+          "rssMiB": 67.484375,
+          "elapsed": "00:50",
+          "state": "Rs"
+        }
+      ]
+    },
+    {
+      "at": "2026-07-16T03:57:45.555Z",
+      "processes": [
+        {
+          "pid": 45890,
+          "cpuPercent": 6.5,
+          "rssMiB": 67.921875,
+          "elapsed": "00:55",
+          "state": "Ss"
+        }
+      ]
+    },
+    {
+      "at": "2026-07-16T03:57:50.574Z",
+      "processes": [
+        {
+          "pid": 45890,
+          "cpuPercent": 4.8,
+          "rssMiB": 67.984375,
+          "elapsed": "01:00",
+          "state": "Ss"
+        }
+      ]
+    },
+    {
+      "at": "2026-07-16T03:57:55.597Z",
+      "processes": [
+        {
+          "pid": 45890,
+          "cpuPercent": 10.9,
+          "rssMiB": 68.921875,
+          "elapsed": "01:05",
+          "state": "Ss"
+        }
+      ]
+    },
+    {
+      "at": "2026-07-16T03:58:00.616Z",
+      "processes": [
+        {
+          "pid": 45890,
+          "cpuPercent": 4.9,
+          "rssMiB": 68.578125,
+          "elapsed": "01:10",
+          "state": "Ss"
+        }
+      ]
+    },
+    {
+      "at": "2026-07-16T03:58:05.631Z",
+      "processes": [
+        {
+          "pid": 45890,
+          "cpuPercent": 5.1,
+          "rssMiB": 68.765625,
+          "elapsed": "01:15",
+          "state": "Ss"
+        }
+      ]
+    },
+    {
+      "at": "2026-07-16T03:58:10.649Z",
+      "processes": [
+        {
+          "pid": 45890,
+          "cpuPercent": 7.2,
+          "rssMiB": 68.875,
+          "elapsed": "01:20",
+          "state": "Rs"
+        }
+      ]
+    },
+    {
+      "at": "2026-07-16T03:58:15.659Z",
+      "processes": [
+        {
+          "pid": 45890,
+          "cpuPercent": 6.3,
+          "rssMiB": 68.578125,
+          "elapsed": "01:25",
+          "state": "Ss"
+        }
+      ]
+    },
+    {
+      "at": "2026-07-16T03:58:20.674Z",
+      "processes": [
+        {
+          "pid": 45890,
+          "cpuPercent": 7.6,
+          "rssMiB": 68.34375,
+          "elapsed": "01:30",
+          "state": "Ss"
+        }
+      ]
+    },
+    {
+      "at": "2026-07-16T03:58:25.691Z",
+      "processes": [
+        {
+          "pid": 45890,
+          "cpuPercent": 5.5,
+          "rssMiB": 68.25,
+          "elapsed": "01:35",
+          "state": "Ss"
+        }
+      ]
+    },
+    {
+      "at": "2026-07-16T03:58:30.705Z",
+      "processes": [
+        {
+          "pid": 45890,
+          "cpuPercent": 7.6,
+          "rssMiB": 68.15625,
+          "elapsed": "01:40",
+          "state": "Ss"
+        }
+      ]
+    },
+    {
+      "at": "2026-07-16T03:58:35.728Z",
+      "processes": [
+        {
+          "pid": 45890,
+          "cpuPercent": 7.1,
+          "rssMiB": 68.171875,
+          "elapsed": "01:45",
+          "state": "Ss"
+        }
+      ]
+    },
+    {
+      "at": "2026-07-16T03:58:40.743Z",
+      "processes": [
+        {
+          "pid": 45890,
+          "cpuPercent": 4.7,
+          "rssMiB": 68.1875,
+          "elapsed": "01:50",
+          "state": "Ss"
+        }
+      ]
+    },
+    {
+      "at": "2026-07-16T03:58:45.759Z",
+      "processes": [
+        {
+          "pid": 45890,
+          "cpuPercent": 7,
+          "rssMiB": 68.328125,
+          "elapsed": "01:55",
+          "state": "Ss"
+        }
+      ]
+    },
+    {
+      "at": "2026-07-16T03:58:50.770Z",
+      "processes": [
+        {
+          "pid": 45890,
+          "cpuPercent": 7.2,
+          "rssMiB": 68.34375,
+          "elapsed": "02:00",
+          "state": "Ss"
+        }
+      ]
+    },
+    {
+      "at": "2026-07-16T03:58:55.790Z",
+      "processes": [
+        {
+          "pid": 45890,
+          "cpuPercent": 6.7,
+          "rssMiB": 67.4375,
+          "elapsed": "02:05",
+          "state": "Ss"
+        }
+      ]
+    },
+    {
+      "at": "2026-07-16T03:59:00.805Z",
+      "processes": [
+        {
+          "pid": 45890,
+          "cpuPercent": 3.5,
+          "rssMiB": 67.125,
+          "elapsed": "02:10",
+          "state": "Ss"
+        }
+      ]
+    },
+    {
+      "at": "2026-07-16T03:59:05.826Z",
+      "processes": [
+        {
+          "pid": 45890,
+          "cpuPercent": 6,
+          "rssMiB": 66.90625,
+          "elapsed": "02:15",
+          "state": "Ss"
+        }
+      ]
+    },
+    {
+      "at": "2026-07-16T03:59:10.842Z",
+      "processes": [
+        {
+          "pid": 45890,
+          "cpuPercent": 7.2,
+          "rssMiB": 67.40625,
+          "elapsed": "02:20",
+          "state": "Ss"
+        }
+      ]
+    },
+    {
+      "at": "2026-07-16T03:59:15.862Z",
+      "processes": [
+        {
+          "pid": 45890,
+          "cpuPercent": 6.4,
+          "rssMiB": 67.03125,
+          "elapsed": "02:25",
+          "state": "Ss"
+        }
+      ]
+    },
+    {
+      "at": "2026-07-16T03:59:20.875Z",
+      "processes": [
+        {
+          "pid": 45890,
+          "cpuPercent": 5.4,
+          "rssMiB": 67.3125,
+          "elapsed": "02:30",
+          "state": "Ss"
+        }
+      ]
+    },
+    {
+      "at": "2026-07-16T03:59:25.891Z",
+      "processes": [
+        {
+          "pid": 45890,
+          "cpuPercent": 4.6,
+          "rssMiB": 67.234375,
+          "elapsed": "02:35",
+          "state": "Rs"
+        }
+      ]
+    },
+    {
+      "at": "2026-07-16T03:59:30.902Z",
+      "processes": [
+        {
+          "pid": 45890,
+          "cpuPercent": 4.2,
+          "rssMiB": 66.828125,
+          "elapsed": "02:40",
+          "state": "Ss"
+        }
+      ]
+    }
+  ]
+}
