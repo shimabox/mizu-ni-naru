@@ -33,6 +33,11 @@ import type {
   BubbleBucket,
   BubbleInstanceBuffers,
 } from './BubbleInstanceBuffers';
+import {
+  CAP_SHADOWS_PER_BUBBLE,
+  CAP_SHADOW_BUBBLES,
+  collectCapShadows,
+} from './CapShadows';
 
 /** 「発火していない」を示す誕生 stepF(age が巨大 → 減衰で消滅)。 */
 const RIPPLE_DEAD_BIRTH = -1e6;
@@ -105,6 +110,12 @@ const createCapDiskGeometry = (
  * 体積の透過光(水中を通る明暗の輪 — A43)の双方に注入する(A7/A8/A32)。
  * volumeMaterial / capMaterial は同一の JS 配列(this.rippleUniform)を
  * 参照するため更新は ingestRipples() の 1 箇所で両方に反映される。
+ *
+ * 接触影(A76): CapShadows.collectCapShadows() が落下中の雫(雫のみ —
+ * 文字原子は記号なので対象外)の
+ * ブロブ影をカメラ近傍 CAP_SHADOW_BUBBLES 球分だけ CPU 選抜し、capMaterial
+ * のみに uCapShadows/uCapShadowMeta として供給する(体積側には影は落とさない
+ * — キャップ表面のみのローカルな陰影のため volumeMaterial には配線しない)。
  */
 export class InnerWaterSystem implements RenderSystem {
   public readonly object: Group;
@@ -123,6 +134,10 @@ export class InnerWaterSystem implements RenderSystem {
     BUBBLE_STATE.Dead,
   );
 
+  /** 接触影(A76)— capMaterial 専用。CapShadows.collectCapShadows() が毎フレーム書き込む。 */
+  private readonly capShadowUniform: Vector4[];
+  private readonly capShadowMetaUniform: Vector4[];
+
   constructor(
     sun: SunUniforms,
     buffers: BubbleInstanceBuffers,
@@ -133,6 +148,15 @@ export class InnerWaterSystem implements RenderSystem {
     this.rippleUniform = [];
     for (let i = 0; i < RIPPLE_NEAR_COUNT * RIPPLES_PER_BUBBLE; i++) {
       this.rippleUniform.push(new Vector4(0, 0, RIPPLE_DEAD_BIRTH, 0));
+    }
+
+    this.capShadowUniform = [];
+    for (let i = 0; i < CAP_SHADOW_BUBBLES * CAP_SHADOWS_PER_BUBBLE; i++) {
+      this.capShadowUniform.push(new Vector4(0, 0, 0, 0));
+    }
+    this.capShadowMetaUniform = [];
+    for (let i = 0; i < CAP_SHADOW_BUBBLES; i++) {
+      this.capShadowMetaUniform.push(new Vector4(-1, 0, 0, 0));
     }
 
     const sssColor = new Color(0x2fc0a8);
@@ -190,6 +214,8 @@ export class InnerWaterSystem implements RenderSystem {
         uStepF: { value: 0 },
         uSssColor: { value: sssColor },
         uInnerRipples: { value: this.rippleUniform },
+        uCapShadows: { value: this.capShadowUniform },
+        uCapShadowMeta: { value: this.capShadowMetaUniform },
       },
       transparent: true,
       depthTest: true,
@@ -237,6 +263,21 @@ export class InnerWaterSystem implements RenderSystem {
     this.capMaterial.uniforms.uStepF.value = frame.stepF;
 
     this.ingestRipples(view);
+
+    // A76: 接触影は capMaterial のみが参照するが、収集自体は毎フレーム
+    // ここで 1 回だけ行う(ingestRipples と同じ場所 — rippleIndexBySlot が
+    // 直前の sync() で確定済みであることに依存する)
+    const cam = frame.camera.position;
+    collectCapShadows(
+      view,
+      frame.alpha,
+      cam.x,
+      cam.y,
+      cam.z,
+      this.buffers.rippleIndexBySlot,
+      this.capShadowUniform,
+      this.capShadowMetaUniform,
+    );
   }
 
   public dispose(): void {
