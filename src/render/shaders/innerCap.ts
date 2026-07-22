@@ -1,4 +1,8 @@
 import {
+  CAP_SHADOWS_PER_BUBBLE,
+  CAP_SHADOW_BUBBLES,
+} from '../bubbles/CapShadows';
+import {
   BUBBLE_INSTANCE_VERTEX_PARS_GLSL,
   MIZU_BLUE_GLSL,
   WATER_TINT_GLSL,
@@ -79,6 +83,10 @@ ${SKY_UNIFORMS_GLSL}
 uniform float uStepF;
 uniform vec3 uSssColor;
 uniform vec4 uInnerRipples[${RIPPLE_NEAR_COUNT * RIPPLES_PER_BUBBLE}];  // [x, z, birthStepF, strength] × 近傍 RIPPLE_NEAR_COUNT 球 × 6 本(A32、球数は A74 で SLOT_COUNT から導出)
+// 球内水面キャップの接触影(A76)— 雫の影ブロブ。CapShadows.ts が
+// カメラ近傍 CAP_SHADOW_BUBBLES 球 × CAP_SHADOWS_PER_BUBBLE 体を CPU 選抜
+uniform vec4 uCapShadows[${CAP_SHADOW_BUBBLES * CAP_SHADOWS_PER_BUBBLE}];   // [localX, localZ, height, r] × 近傍${CAP_SHADOW_BUBBLES}球×${CAP_SHADOWS_PER_BUBBLE}体(A76)
+uniform vec4 uCapShadowMeta[${CAP_SHADOW_BUBBLES}];  // [rippleIndex, count, fade, 0](A76)
 varying vec3 vWorldPos;
 varying vec2 vCapLocal;
 varying float vRadial;
@@ -127,11 +135,42 @@ void main() {
   vec3 body = mix(baseColor, MIZU_DEEP, 0.34 + 0.46 * vFill);
   body += uSssColor * min(length(n.xz) * 1.4, 0.35);   // リング波頭のターコイズ(控えめ)
 
+  // 接触影(A76)— 落下中の雫が水面に落とすうっすらしたブロブ影(A76 改訂:
+  // 文字原子は記号として漂う主役なので影を落とさない — 雫のみ)。
+  // 低い(h 小)・大きい(r 大)ほど濃く鋭く、高いほど薄く広がる半影(§ペナンブラ pr は
+  // s.w(半径)を基準に s.z(高さ)で広げる)。太陽方向へ弱くオフセットして「光源から
+  // 見て影が伸びる」感を出す(夜=太陽が低い/沈んでいるときは sunShift=0 で
+  // 真下投影にフォールバック — 昼夜で影の落ち方が破綻しない)。vSlot(rippleIndex)
+  // で uCapShadowMeta と照合し、対象外(vSlot<0)の球は影も出さない(InnerRipple と対称)。
+  float shade = 0.0;
+  if (vSlot >= 0.0) {
+    vec2 sunShift = (uSunDir.y > 0.05)
+      ? -uSunDir.xz / max(uSunDir.y, 0.35)
+      : vec2(0.0);
+    for (int j = 0; j < ${CAP_SHADOW_BUBBLES}; j++) {
+      vec4 meta = uCapShadowMeta[j];
+      if (abs(meta.x - vSlot) > 0.5) continue;
+      for (int k = 0; k < ${CAP_SHADOWS_PER_BUBBLE}; k++) {
+        if (float(k) >= meta.y) break;
+        vec4 s = uCapShadows[j * ${CAP_SHADOWS_PER_BUBBLE} + k];
+        vec2 c = s.xy + sunShift * min(s.z, 1.2) * 0.5;
+        float pr = s.w * 1.15 + s.z * 0.5;       // 半影: 高いほど広がる
+        float fall = 1.0 - smoothstep(0.0, pr, length(vCapLocal - c));
+        shade += fall * fall * exp(-1.4 * s.z) * meta.z;
+      }
+    }
+    shade = min(shade, 0.5);
+  }
+  // うっすら要件(A76): 最大でも 3 割減。縁のメニスカス発光(下の smoothstep 加算)には掛けない
+  body *= 1.0 - 0.30 * shade;
+
   // 空の映り込みは baseColor で色相を引き戻してから弱めに混ぜる(白飛び防止)
   vec3 reflection = mix(sky(reflect(viewDir, n)), baseColor, 0.55);
   vec3 color = mix(body, reflection, fresnel * 0.40);
   vec3 halfDir = normalize(uSunDir - viewDir);
-  color += uSunColor * (0.5 * pow(max(dot(n, halfDir), 0.0), 300.0));
+  // 太陽スペキュラは接触影で強めに減衰(0.85)— 雫の真下でグリントが消えるのが
+  // 接触影の最も分かりやすいリアリティ(A76)
+  color += uSunColor * (0.5 * pow(max(dot(n, halfDir), 0.0), 300.0) * (1.0 - 0.85 * shade));
 
   // 縁(92% 以遠)はメニスカス帯(§3)へ滑らかに接続(A44: tint 追従)
   color += baseColor * smoothstep(0.92, 1.0, vRadial) * 1.1;
