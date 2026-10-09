@@ -16,6 +16,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import { assertChromeVersion } from './chrome-version.mts';
 import type {
   DistributionSummary,
   PerformanceProbeSnapshot,
@@ -373,6 +374,10 @@ const environmentExpression = `(() => {
 
 const run = async (): Promise<void> => {
   const options = await parseArgs();
+  const { stdout } = await execFileAsync(options.chromePath, ['--version'], {
+    timeout: 10_000,
+  });
+  assertChromeVersion(stdout.trim());
   const targetUrl = new URL(options.url);
   const origin = targetUrl.origin;
   const viteCli = join(projectRoot, 'node_modules/vite/bin/vite.js');

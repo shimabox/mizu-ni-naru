@@ -10,7 +10,7 @@
 
 - Node.js 22
 - `npm install`済みの依存パッケージ
-- `bench:browser`を使う場合のみGoogle ChromeまたはChromium
+- `bench:browser`を使う場合のみGoogle ChromeまたはChromium **155.0.8059.39 以降**
 
 まず全体のシミュレーション性能を確認するだけなら、次のコマンドでよい。
 
@@ -321,6 +321,10 @@ rawファイルへのリンクと主要sample。
 ### Node REPLが使えない
 
 問題ない。計測ツールはNode REPLを使わず、リポジトリのルートで`npm run ...`を実行するだけでよい。
+
+### Chromeが古い
+
+古い Chrome や版を判定できない実行ファイルは、preview や計測ページを開く前に拒否する。Chrome を更新してから実行する。`--chrome` や `CHROME_PATH` で指定したブラウザにも同じ最低版を適用する。
 
 ### Chromeが見つからない
 
